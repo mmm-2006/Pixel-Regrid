@@ -16,7 +16,12 @@ from perfect_pixel.perfect_pixel import (
 SUPPORTED = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"}
 OUTPUT_FOLDER = "perfect_pixel_output"
 MAX_IMAGE_PIXELS = 32_000_000
+SCALE_CHANGE_THRESHOLD = 10
 SAMPLERS = {"center": sample_center, "median": sample_median, "majority": sample_majority}
+
+
+def canvas_limit(layout):
+    return 8192 if layout == "keep" else 1024
 
 
 @dataclass(frozen=True)
@@ -30,6 +35,7 @@ class Options:
     palette_size: int = 32
     detail: int = 1
     direct: bool = False
+    alpha_threshold: int = 1
 
     def validate(self):
         if self.method not in SAMPLERS:
@@ -38,12 +44,15 @@ class Options:
             type(n) is not int or not 1 <= n <= 1024 for n in self.grid
         )):
             raise ValueError("输出宽、高必须是 1～1024 的整数")
-        if self.layout not in ("original", "crop", "keep", "fit", "canvas_fit", "stretch"):
+        if self.layout not in ("original", "keep", "fit", "canvas_fit", "stretch"):
             raise ValueError("未知主体 / 画布处理方式")
+        limit = canvas_limit(self.layout)
         if self.canvas is not None and (len(self.canvas) != 2 or any(
-            type(n) is not int or not 1 <= n <= 1024 for n in self.canvas
+            type(n) is not int or not 1 <= n <= limit for n in self.canvas
         )):
-            raise ValueError("画布宽、高必须是 1～1024 的整数")
+            raise ValueError(f"画布宽、高必须是 1～{limit} 的整数")
+        if self.canvas is not None and self.canvas[0] * self.canvas[1] > MAX_IMAGE_PIXELS:
+            raise ValueError("画布总像素不能超过 3200 万，请减小宽或高")
         if self.layout in ("keep", "fit", "canvas_fit", "stretch") and self.canvas is None:
             raise ValueError("请指定画布宽、高")
         if self.resample not in ("nearest", "pixel", "k-centroid"):
@@ -54,6 +63,8 @@ class Options:
             raise ValueError("细节保护必须为关闭、适中或较强")
         if type(self.direct) is not bool:
             raise ValueError("直接转换选项必须为布尔值")
+        if type(self.alpha_threshold) is not int or not 0 <= self.alpha_threshold <= 254:
+            raise ValueError("透明噪点阈值必须是 0～254 的整数；0 表示关闭")
 
 
 @dataclass(frozen=True)
@@ -62,24 +73,61 @@ class ImageInfo:
     subject: tuple[int, int] | None
     has_alpha: bool
     recovery: str = "grid"
+    alpha_threshold: int = 1
 
 
-def subject_bounds(image):
-    """Return exclusive bounds of every nontransparent pixel; never discard faint edges."""
+def subject_bounds(image, alpha_threshold=1):
+    """Use alpha only to select crop bounds; leave pixels inside those bounds intact."""
     h, w = image.shape[:2]
     if image.shape[2] == 3:
         return 0, 0, w, h
-    ys, xs = np.nonzero(image[..., 3] > 0)
+    ys, xs = np.nonzero(image[..., 3] > alpha_threshold)
     if not len(xs):
         return None
     return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
 
 
-def image_info(image, recovery="grid"):
+def image_info(image, recovery="grid", alpha_threshold=1):
     h, w = image.shape[:2]
-    bounds = subject_bounds(image)
+    bounds = subject_bounds(image, alpha_threshold)
     subject = (bounds[2] - bounds[0], bounds[3] - bounds[1]) if bounds else None
-    return ImageInfo((w, h), subject, image.shape[2] == 4, recovery)
+    return ImageInfo((w, h), subject, image.shape[2] == 4, recovery, alpha_threshold)
+
+
+def scaled_size(source, canvas, layout):
+    """Share exact rounded dimensions between rendering and the size-change notice."""
+    if layout == "stretch":
+        return canvas
+    sw, sh = source
+    cw, ch = canvas
+    factor = min(cw / sw, ch / sh)
+    return min(cw, max(1, round(sw * factor))), min(ch, max(1, round(sh * factor)))
+
+
+@dataclass(frozen=True)
+class ScaleInfo:
+    source: tuple[int, int]
+    target: tuple[int, int]
+
+    @property
+    def changes(self):
+        return tuple((target - source) / source for source, target in zip(self.source, self.target))
+
+    @property
+    def exceeds_threshold(self):
+        # Compare integers so an exact 10% change stays within the threshold.
+        return any(abs(target - source) * 100 > source * SCALE_CHANGE_THRESHOLD
+                   for source, target in zip(self.source, self.target))
+
+
+def scaling_info(info, options):
+    """Report grid-size changes, never interpret high-resolution source size as a pixel grid."""
+    if info is None or info.recovery != "grid" or options.layout not in ("fit", "canvas_fit", "stretch"):
+        return None
+    source = info.subject if options.layout == "fit" else info.grid
+    if source is None:
+        return None
+    return ScaleInfo(source, scaled_size(source, options.canvas, options.layout))
 
 
 def layout_image(image, options, cancel=None):
@@ -88,13 +136,13 @@ def layout_image(image, options, cancel=None):
     if options.layout == "original":
         return image
     bounds = ((0, 0, image.shape[1], image.shape[0])
-              if options.layout in ("canvas_fit", "stretch") else subject_bounds(image))
+              if options.layout in ("canvas_fit", "stretch") else subject_bounds(image, options.alpha_threshold))
     if bounds is None:
+        if image[..., 3].any():
+            raise ValueError("没有超过透明噪点阈值的主体，请降低阈值或设为 0")
         raise ValueError("图片完全透明，没有可识别的主体")
     x0, y0, x1, y1 = bounds
     subject = image[y0:y1, x0:x1]
-    if options.layout == "crop":
-        return subject.copy()
     cw, ch = options.canvas
     sh, sw = subject.shape[:2]
     if options.layout == "keep" and (cw < sw or ch < sh):
@@ -103,9 +151,7 @@ def layout_image(image, options, cancel=None):
     if subject.shape[2] == 3:
         subject = cv2.cvtColor(subject, cv2.COLOR_BGR2BGRA)
     if options.layout in ("fit", "canvas_fit", "stretch"):
-        factor = min(cw / sw, ch / sh)
-        tw, th = ((cw, ch) if options.layout == "stretch" else
-                  (min(cw, max(1, round(sw * factor))), min(ch, max(1, round(sh * factor)))))
+        tw, th = scaled_size((sw, sh), options.canvas, options.layout)
         if options.resample == "pixel":
             subject = target_pixels(subject, (tw, th), options.palette_size, options.detail,
                                     cancel=cancel, wrap=options.layout == "stretch")
@@ -261,7 +307,7 @@ def prepare_image(image, options, cancel=None):
             if options.resample not in ("pixel", "k-centroid") or options.layout not in ("fit", "canvas_fit", "stretch") or options.grid:
                 raise
             out, recovery = image, "fallback"
-    return out, image_info(out, recovery)
+    return out, image_info(out, recovery, options.alpha_threshold)
 
 
 def refine_image(image, options, cancel=None):

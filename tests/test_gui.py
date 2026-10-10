@@ -127,16 +127,20 @@ class GuiIntegrationTests(unittest.TestCase):
         self.assertEqual(settings["resample"], "像素硬边 · 最近邻")
         self.assertEqual((settings["palette"], settings["detail"]), ("16 色", "较强"))
         # A saved selection of the removed mode must recover on startup.
-        gui.SETTINGS.write_text(gui.json.dumps({**settings, "resample": "平滑缩小 · 面积平均", "scale": "16 倍"}),
+        gui.SETTINGS.write_text(gui.json.dumps({**settings, "resample": "平滑缩小 · 面积平均",
+                                               "scale": "16 倍", "layout": "只裁透明边 · 最小画布"}),
                                 encoding="utf-8")
         migrated = gui.App()
         try:
             migrated.withdraw()
             self.assertEqual(migrated.resample.get(), "目标像素 · 结构保护")
             self.assertNotIn("平滑缩小 · 面积平均", migrated.resample_input.cget("values"))
+            self.assertNotIn("只裁透明边 · 最小画布", gui.LAYOUTS)
+            self.assertEqual(migrated.layout.get(), "保持原画布")
             self.assertFalse(hasattr(migrated, "scale"))
             migrated.save_settings()
             self.assertNotIn("scale", gui.load_settings())
+            self.assertEqual(gui.load_settings()["layout"], "保持原画布")
         finally:
             migrated.destroy()
             migrated.preview_pool.shutdown(wait=True, cancel_futures=True)
@@ -233,7 +237,7 @@ class GuiIntegrationTests(unittest.TestCase):
         self.app.use_grid_canvas()
         self.pump_until(lambda: "16 × 16" in self.app.output_caption.cget("text"))
         self.assertEqual(self.app.get_options().canvas, (16, 16))
-        self.app.layout.set("只裁透明边 · 最小画布")
+        self.app.use_subject_canvas()
         self.pump_until(lambda: "6 × 10" in self.app.output_caption.cget("text"))
         self.app.layout.set("主体等比例缩放 · 改画布")
         self.app.set_canvas_size(8)
@@ -249,6 +253,100 @@ class GuiIntegrationTests(unittest.TestCase):
         result = self.app.results[path_key(path)]
         self.assertEqual((result.width, result.height), (8, 8))
         self.assertEqual(result.info.subject, (6, 10))
+
+    def test_direct_large_canvas_crop_input_size_and_settings_roundtrip(self):
+        path = self.root / "大主体.png"
+        image = np.zeros((1254, 1254, 4), np.uint8)
+        image[100:1151, 300:907] = [10, 40, 90, 128]
+        cv2.imencode(".png", image)[1].tofile(path)
+        self.app.layout.set("保持原画布")
+        self.app.append_files([path])
+        self.pump_until(lambda: self.app.current_info is not None)
+        self.app.use_subject_canvas()
+        self.pump_until(lambda: "607 × 1051" in self.app.output_caption.cget("text"))
+        self.assertEqual(self.app.get_options().canvas, (607, 1051))
+        self.assertEqual(float(self.app.canvas_height_input.cget("to")), 8192)
+        self.app.use_grid_canvas()
+        self.pump_until(lambda: "1254 × 1254" in self.app.output_caption.cget("text"))
+        self.app.save_settings()
+        reopened = gui.App()
+        try:
+            reopened.withdraw()
+            self.assertEqual(reopened.get_options().canvas, (1254, 1254))
+            self.assertEqual(float(reopened.canvas_width_input.cget("to")), 8192)
+            reopened.layout.set("主体等比例缩放 · 改画布")
+            self.assertEqual(float(reopened.canvas_width_input.cget("to")), 1024)
+            with self.assertRaisesRegex(ValueError, "1024"):
+                reopened.get_options()
+        finally:
+            reopened.destroy()
+            reopened.preview_pool.shutdown(wait=True, cancel_futures=True)
+
+    def test_alpha_threshold_live_boundary_cache_crop_export_and_settings(self):
+        path = self.root / "透明杂点.png"
+        image = np.zeros((16, 16, 4), np.uint8)
+        image[3:13, 5:11] = [10, 40, 90, 128]
+        image[0, 0] = image[15, 15] = [20, 30, 40, 1]
+        image[6, 7] = [50, 60, 70, 1]
+        cv2.imencode(".png", image)[1].tofile(path)
+        self.app.layout.set("保持原画布")
+        with patch.object(gui, "prepare_image", wraps=gui.prepare_image) as compute:
+            self.app.append_files([path])
+            self.pump_until(lambda: self.app.current_info is not None)
+            self.assertEqual(self.app.current_info.subject, (6, 10))
+            self.app.alpha_threshold.set("0")
+            self.pump_until(lambda: self.app.current_info is not None and self.app.current_info.subject == (16, 16))
+            self.app.alpha_threshold.set("")
+            self.pump_until(lambda: "透明噪点阈值" in self.app.output_view.cget("text"))
+            self.app.alpha_threshold.set("1")
+            self.pump_until(lambda: self.app.current_info is not None and self.app.current_info.subject == (6, 10))
+            self.app.use_subject_canvas()
+            self.pump_until(lambda: "6 × 10" in self.app.output_caption.cget("text"))
+            self.assertEqual(compute.call_count, 1)
+        self.app.alpha_threshold.set("16")
+        self.app.save_settings()
+        self.assertEqual(gui.load_settings()["alpha_threshold"], 16)
+        reopened = gui.App()
+        try:
+            reopened.withdraw()
+            self.assertEqual(reopened.get_options().alpha_threshold, 16)
+        finally:
+            reopened.destroy()
+            reopened.preview_pool.shutdown(wait=True, cancel_futures=True)
+        self.app.alpha_threshold.set("1")
+        self.app.start()
+        self.assertEqual(str(self.app.alpha_threshold_input.cget("state")), "disabled")
+        self.pump_until(lambda: not self.app.busy)
+        result = self.app.results[path_key(path)]
+        np.testing.assert_array_equal(gui.read_image(result.output), image[3:13, 5:11])
+        self.assertEqual(result.info.subject, (6, 10))
+
+    def test_scale_notice_updates_for_subject_full_canvas_and_direct_input(self):
+        import pixel_core as core
+        path = self.root / "网格.png"
+        image = np.zeros((42, 42, 4), np.uint8)
+        image[4:39, 11:31] = [30, 80, 200, 255]
+        cv2.imencode(".png", image)[1].tofile(path)
+        self.app.mode.set("自动识别")
+        self.app.set_canvas_size(32)
+        with patch.object(core, "_refine_grid_image", return_value=image):
+            self.app.append_files([path])
+            self.pump_until(lambda: "主体 20×35 → 18×32" in self.app.scale_caption.cget("text"))
+            self.assertIn("宽缩小 10.0%", self.app.scale_caption.cget("text"))
+            self.assertIn("在 10% 以内", self.app.scale_caption.cget("text"))
+            self.assertEqual(str(self.app.scale_caption.cget("foreground")), "#555")
+            self.app.layout.set("整图等比例缩放 · 保留原留白")
+            self.pump_until(lambda: "整图 42×42 → 32×32" in self.app.scale_caption.cget("text"))
+            self.assertIn("宽缩小 23.8%", self.app.scale_caption.cget("text"))
+            self.assertIn("超过 10%", self.app.scale_caption.cget("text"))
+            self.assertEqual(str(self.app.scale_caption.cget("foreground")), "#9b4f00")
+            self.app.layout.set("主体不缩放 · 改画布")
+            self.app.set_canvas_size(42)
+            self.pump_until(lambda: "主体未缩放" in self.app.scale_caption.cget("text"))
+            self.app.mode.set("原图直接转换")
+            self.app.layout.set("主体等比例缩放 · 改画布")
+            self.app.set_canvas_size(32)
+            self.pump_until(lambda: "不套用 10%" in self.app.scale_caption.cget("text"))
 
     def test_full_canvas_fit_controls_preview_export_and_saved_setting(self):
         path = self.root / "整图.png"
@@ -378,6 +476,19 @@ class GuiIntegrationTests(unittest.TestCase):
 
 
 class PreviewRendererTests(unittest.TestCase):
+    def test_scale_notice_distinguishes_enlargement_and_fallback(self):
+        info = gui.image_info(np.full((30, 30, 4), 255, np.uint8))
+        text, attention = gui.scaling_text(info, gui.Options(layout="stretch", canvas=(40, 40)))
+        self.assertTrue(attention)
+        self.assertIn("放大 33.3%", text)
+        self.assertIn("放大不会补回细节", text)
+        self.assertNotIn("丢失细线", text)
+        info = gui.image_info(np.full((1254, 1254, 4), 255, np.uint8), "fallback")
+        text, attention = gui.scaling_text(info, gui.Options(layout="stretch", canvas=(32, 32)))
+        self.assertFalse(attention)
+        self.assertIn("网格识别失败", text)
+        self.assertIn("不套用 10%", text)
+
     def test_cache_reuse_and_live_matches_export_for_all_methods(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "source.png"
@@ -410,7 +521,7 @@ class PreviewRendererTests(unittest.TestCase):
             cv2.imencode(".png", image)[1].tofile(path)
             renderer = gui.PreviewRenderer()
             with patch.object(gui, "prepare_image", wraps=gui.prepare_image) as compute:
-                for layout, canvas, resample in (("original", None, "nearest"), ("crop", None, "nearest"),
+                for layout, canvas, resample in (("original", None, "nearest"),
                                        ("keep", (12, 14), "nearest"), ("fit", (8, 8), "nearest"),
                                        ("fit", (8, 8), "pixel"),
                                        ("canvas_fit", (12, 8), "nearest"),

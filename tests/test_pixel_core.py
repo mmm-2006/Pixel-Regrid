@@ -164,8 +164,42 @@ class PixelCoreTests(unittest.TestCase):
         self.assertEqual(info.grid, (42, 42))
         self.assertEqual(info.subject, (20, 35))
         self.assertEqual(core.subject_bounds(image), (11, 4, 31, 39))
-        crop = core.layout_image(image, core.Options(layout="crop"))
+        crop = core.layout_image(image, core.Options(layout="keep", canvas=info.subject))
         np.testing.assert_array_equal(crop, image[4:39, 11:31])
+
+    def test_alpha_threshold_crop_discards_only_outside_bounds_and_preserves_rgba(self):
+        image = np.zeros((20, 20, 4), np.uint8)
+        image[5:15, 7:13] = [10, 30, 200, 64]
+        image[1, 1] = image[18, 18] = [100, 120, 140, 1]
+        image[8, 9] = [5, 15, 25, 1]
+        image[9, 9] = [50, 60, 70, 0]
+        path = self.write("透明杂点.png", image)
+        result = core.process_file(path, core.Options(direct=True, layout="keep", canvas=(6, 10)))
+        self.assertEqual(result.info.subject, (6, 10))
+        np.testing.assert_array_equal(core.read_image(result.output), image[5:15, 7:13])
+        self.assertEqual(core.image_info(image, alpha_threshold=0).subject, (18, 18))
+        original = core.layout_image(image, core.Options(alpha_threshold=254))
+        self.assertIs(original, image)
+        for layout in ("canvas_fit", "stretch"):
+            out = core.layout_image(image, core.Options(layout=layout, canvas=(20, 20), alpha_threshold=254))
+            np.testing.assert_array_equal(out, image)
+
+    def test_alpha_threshold_preserves_separate_parts_and_handles_faint_only_subject(self):
+        image = np.zeros((10, 12, 4), np.uint8)
+        image[2:4, 2:4] = [10, 20, 30, 64]
+        image[6:8, 8:10] = [40, 50, 60, 64]
+        self.assertEqual(core.image_info(image).subject, (8, 6))
+        self.assertIsNone(core.image_info(image, alpha_threshold=64).subject)
+        with self.assertRaisesRegex(ValueError, "降低阈值"):
+            core.layout_image(image, core.Options(layout="keep", canvas=(12, 10), alpha_threshold=64))
+        np.testing.assert_array_equal(
+            core.layout_image(image, core.Options(layout="keep", canvas=(8, 6), alpha_threshold=0)),
+            image[2:8, 2:10])
+        opaque = np.full((3, 4, 3), 200, np.uint8)
+        self.assertEqual(core.image_info(opaque, alpha_threshold=254).subject, (4, 3))
+        for threshold in (-1, 255, True, 1.5, "1"):
+            with self.assertRaisesRegex(ValueError, "透明噪点阈值"):
+                core.Options(alpha_threshold=threshold).validate()
 
     def test_keep_subject_exact_pixels_minimum_canvas_and_centering(self):
         image = np.zeros((42, 42, 4), np.uint8)
@@ -181,6 +215,29 @@ class PixelCoreTests(unittest.TestCase):
         for canvas in ((19, 40), (32, 32), (42, 34)):
             with self.assertRaisesRegex(ValueError, "至少为 20×35"):
                 core.layout_image(image, core.Options(layout="keep", canvas=canvas))
+
+    def test_direct_large_subject_canvas_preserves_every_pixel_on_export(self):
+        image = np.zeros((1254, 1254, 4), np.uint8)
+        subject = np.random.default_rng(5).integers(1, 256, (1051, 607, 4), dtype=np.uint8)
+        image[100:1151, 300:907] = subject
+        path = self.write("大主体.png", image)
+        for canvas in ((607, 1051), (1254, 1254), (2048, 1254)):
+            with self.subTest(canvas=canvas):
+                result = core.process_file(path, core.Options(direct=True, layout="keep", canvas=canvas))
+                out = core.read_image(result.output)
+                self.assertEqual(out.shape, (canvas[1], canvas[0], 4))
+                left, top = (canvas[0] - 607) // 2, (canvas[1] - 1051) // 2
+                np.testing.assert_array_equal(out[top:top + 1051, left:left + 607], subject)
+                self.assertEqual(np.count_nonzero(out[..., 3]), 607 * 1051)
+
+    def test_canvas_limits_reject_oversized_allocations_and_keep_scaling_bound(self):
+        for canvas, message in (((8193, 1), "8192"), ((8192, 8192), "3200 万"),
+                                ((0, 10), "8192")):
+            with self.assertRaisesRegex(ValueError, message):
+                core.Options(layout="keep", canvas=canvas).validate()
+        for layout in ("fit", "canvas_fit", "stretch"):
+            with self.assertRaisesRegex(ValueError, "1024"):
+                core.Options(layout=layout, canvas=(1254, 1254)).validate()
 
     def test_fit_keeps_aspect_and_visible_colors(self):
         image = np.zeros((12, 12, 4), np.uint8)
@@ -246,7 +303,7 @@ class PixelCoreTests(unittest.TestCase):
         empty = np.zeros((4, 4, 4), np.uint8)
         self.assertIsNone(core.image_info(empty).subject)
         self.assertIs(core.layout_image(empty, core.Options()), empty)
-        for layout in ("crop", "keep", "fit"):
+        for layout in ("keep", "fit"):
             with self.assertRaisesRegex(ValueError, "完全透明"):
                 core.layout_image(empty, core.Options(layout=layout, canvas=(4, 4)))
         opaque = np.full((3, 2, 3), [30, 50, 80], np.uint8)
@@ -256,8 +313,40 @@ class PixelCoreTests(unittest.TestCase):
         self.assertTrue(np.all(padded[1:4, 1:3, 3] == 255))
         self.assertTrue(np.all(padded[0] == 0))
 
+    def test_scale_notice_uses_actual_subject_size_and_ignores_padding(self):
+        image = np.zeros((42, 42, 4), np.uint8)
+        image[4:39, 11:31] = [30, 80, 200, 255]
+        info = core.image_info(image)
+        fit = core.Options(layout="fit", canvas=(32, 32))
+        scale = core.scaling_info(info, fit)
+        self.assertEqual((scale.source, scale.target), ((20, 35), (18, 32)))
+        self.assertEqual(core.image_info(core.layout_image(image, fit)).subject, scale.target)
+        self.assertFalse(scale.exceeds_threshold)  # Width changes by exactly 10%.
+        whole = core.scaling_info(info, core.Options(layout="canvas_fit", canvas=(32, 32)))
+        self.assertEqual((whole.source, whole.target), ((42, 42), (32, 32)))
+        self.assertTrue(whole.exceeds_threshold)
+        opaque = np.full((60, 30, 3), 120, np.uint8)
+        options = core.Options(layout="canvas_fit", canvas=(100, 54))
+        scale = core.scaling_info(core.image_info(opaque), options)
+        self.assertEqual(scale.target, (27, 54))
+        self.assertEqual(core.image_info(core.layout_image(opaque, options)).subject, scale.target)
+        self.assertFalse(scale.exceeds_threshold)  # Wide transparent padding is not an enlargement.
+
+    def test_scale_notice_threshold_direction_and_modes(self):
+        info = core.ImageInfo((30, 30), (30, 30), True)
+        for size, exceeds in ((27, False), (26, True), (32, False), (33, False), (34, True)):
+            with self.subTest(size=size):
+                scale = core.scaling_info(info, core.Options(layout="stretch", canvas=(size, size)))
+                self.assertEqual(scale.exceeds_threshold, exceeds)
+        for layout in ("original", "keep"):
+            self.assertIsNone(core.scaling_info(info, core.Options(layout=layout, canvas=(64, 64))))
+        for recovery in ("direct", "fallback"):
+            info = core.ImageInfo((1254, 1254), (500, 924), True, recovery)
+            self.assertIsNone(core.scaling_info(info, core.Options(layout="fit", canvas=(32, 32))))
+
     def test_canvas_validation_and_export_metadata(self):
         for options in (core.Options(layout="unknown"), core.Options(layout="keep"),
+                        core.Options(layout="crop"),
                         core.Options(layout="canvas_fit"), core.Options(resample="bad"),
                         core.Options(resample="area"),
                         core.Options(canvas=(0, 2)), core.Options(canvas=(3, 1025)),

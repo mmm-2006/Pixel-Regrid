@@ -21,13 +21,14 @@ for variable, pattern in (("TCL_LIBRARY", "tcl*/init.tcl"), ("TK_LIBRARY", "tk*/
 
 import cv2
 import numpy as np
-from pixel_core import (Options, SUPPORTED, layout_image, path_key,
-                        prepare_image, process_file, read_image, scan_folder)
+from pixel_core import (Options, SUPPORTED, SCALE_CHANGE_THRESHOLD, canvas_limit, image_info,
+                        layout_image, path_key, prepare_image, process_file, read_image,
+                        scaling_info, scan_folder)
 
 HERE = Path(__file__).resolve().parent
 SETTINGS = HERE / "perfect_pixel_settings.json"
 METHODS = {"中心取样 · 快速": "center", "中位数 · 去噪": "median", "多数色 · 较慢": "majority"}
-LAYOUTS = {"保持原画布": "original", "只裁透明边 · 最小画布": "crop",
+LAYOUTS = {"保持原画布": "original",
            "主体不缩放 · 改画布": "keep", "主体等比例缩放 · 改画布": "fit",
            "整图等比例缩放 · 保留原留白": "canvas_fit",
            "方块铺满 · 改尺寸": "stretch"}
@@ -37,7 +38,6 @@ PALETTES = {"保留颜色": 0, "8 色": 8, "16 色": 16, "32 色": 32, "64 色":
 DETAILS = {"关闭": 0, "适中": 1, "较强": 2}
 LAYOUT_HELP = {
     "original": "保留完整网格或原图，不改变尺寸。要输出 32×32，请选择下方尺寸预设。",
-    "crop": "只裁掉外围透明留白，主体像素保持原样。",
     "keep": "主体像素保持原样，居中放入目标画布；画布不能小于主体。",
     "fit": "先裁透明留白，再等比例缩放主体；适合物品图标。",
     "canvas_fit": "主体和原有留白一起等比例缩放；比例不同时补透明边。",
@@ -56,12 +56,42 @@ def info_text(info):
     gw, gh = info.grid
     source = f"网格 {gw}×{gh}" if info.recovery == "grid" else f"原图 {gw}×{gh}"
     if info.subject is None:
-        return f"{source} · 完全透明，没有主体"
+        return f"{source} · 未检测到主体（完全透明或低于透明阈值，请尝试设为 0）"
     sw, sh = info.subject
     suffix = "" if info.has_alpha else "（无透明通道，按整图计）"
+    if info.has_alpha and info.alpha_threshold:
+        suffix += f" · 裁边忽略透明度 ≤ {info.alpha_threshold}"
     if info.recovery == "fallback":
         suffix += " · 网格识别失败，已直接转换"
     return f"{source} · 主体 {sw}×{sh} · 最小画布 {sw}×{sh}{suffix}"
+
+
+def scaling_text(info, options):
+    if info is None:
+        return "缩放提示：等待识别。", False
+    if options.layout in ("original", "keep"):
+        return "缩放提示：主体未缩放，裁边或补透明画布不计入尺寸变化。", False
+    if info.recovery != "grid":
+        prefix = "网格识别失败，已从原图转换" if info.recovery == "fallback" else "原图直接转换"
+        return f"缩放提示：{prefix}；原图分辨率不代表真实像素格数，不套用 10% 网格变化判断，请比较预览。", False
+    scale = scaling_info(info, options)
+    if scale is None:
+        return "缩放提示：没有可用于主体缩放评估的像素。", False
+    kind = "主体" if options.layout == "fit" else "整图"
+    source, target = scale.source, scale.target
+    change_text = " · ".join(f"{axis}{'缩小' if change < 0 else '放大' if change > 0 else '变化'} {abs(change):.1%}"
+                             for axis, change in zip(("宽", "高"), scale.changes))
+    text = (f"缩放提示（{SCALE_CHANGE_THRESHOLD}% 经验阈值）：{kind} {source[0]}×{source[1]} → "
+            f"{target[0]}×{target[1]} · {change_text}。\n")
+    if scale.exceeds_threshold:
+        if any((source - target) * 100 > source * SCALE_CHANGE_THRESHOLD
+               for source, target in zip(scale.source, scale.target)):
+            text += "尺寸变化超过 10%：可能丢失细线、高光，或出现断线、杂点；建议对比原图直接转换的效果。"
+        else:
+            text += "尺寸变化超过 10%：放大不会补回细节，非整数倍放大可能使像素块粗细不均；请检查预览。"
+    else:
+        text += "尺寸变化在 10% 以内；这只反映尺寸变化，仍需检查细线、高光和网格还原效果。"
+    return text, scale.exceeds_threshold
 
 
 def load_settings():
@@ -130,6 +160,9 @@ class PreviewRenderer:
                     self.infos.pop(old_key, None)
             self.outputs.move_to_end(key)
             info = self.infos[key]
+            if info.alpha_threshold != options.alpha_threshold:
+                info = image_info(self.outputs[key], info.recovery, options.alpha_threshold)
+                self.infos[key] = info
             output = image_thumbnail(layout_image(self.outputs[key], options, cancel=cancelled), width, height)
         except Exception as exc:
             output = f"无法预览：{exc}"
@@ -141,7 +174,7 @@ class App(tk.Tk):
         super().__init__()
         self.title("Perfect Pixel · 像素画整理")
         self.geometry("1060x930")
-        self.minsize(880, 820)
+        self.minsize(880, 900)
         self.settings = load_settings()
         # Retire uniform manual-grid sampling, preserving its final size as a
         # target canvas only when the old layout did not already specify one.
@@ -152,6 +185,10 @@ class App(tk.Tk):
                 for axis in ("width", "height"):
                     value = self.settings.get(axis, 32)
                     self.settings["canvas_" + axis] = value if type(value) is int and 1 <= value <= 1024 else 32
+        if self.settings.get("layout") == "只裁透明边 · 最小画布":
+            # Its former per-image canvas has no saved fixed dimensions. Keep
+            # the input intact until the user chooses "裁到主体大小".
+            self.settings["layout"] = "保持原画布"
         geometry = self.settings.get("geometry", "")
         if isinstance(geometry, str):
             import re
@@ -178,7 +215,7 @@ class App(tk.Tk):
         self._ui()
         for variable in (self.mode, self.method,
                          self.layout, self.canvas_width, self.canvas_height, self.resample,
-                         self.palette, self.detail):
+                         self.palette, self.detail, self.alpha_threshold):
             variable.trace_add("write", self.preview_options_changed)
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.tree.bind("<Delete>", lambda _: self.remove_selected())
@@ -203,10 +240,12 @@ class App(tk.Tk):
         style.configure("Treeview", rowheight=27)
         root = ttk.Frame(self, padding=16)
         root.pack(fill="both", expand=True)
-        ttk.Label(root, text="Perfect Pixel · 像素画整理", font=("Microsoft YaHei UI", 17, "bold")).pack(anchor="w")
-        ttk.Label(root, text="整理 AI 像素风图片，或导出指定尺寸的 Minecraft 贴图。支持透明 PNG。", foreground="#555").pack(anchor="w", pady=(4, 12))
+        root.columnconfigure(0, weight=1)
+        root.rowconfigure(3, weight=1)
+        ttk.Label(root, text="Perfect Pixel · 像素画整理", font=("Microsoft YaHei UI", 17, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(root, text="整理 AI 像素风图片，或导出指定尺寸的 Minecraft 贴图。支持透明 PNG。", foreground="#555").grid(row=1, column=0, sticky="w", pady=(4, 12))
         toolbar = ttk.Frame(root)
-        toolbar.pack(fill="x")
+        toolbar.grid(row=2, column=0, sticky="ew")
         for text, command in (("添加图片…", self.add_files), ("添加文件夹…", self.add_folder),
                               ("移除选中", self.remove_selected), ("清空", self.clear)):
             self._button(toolbar, text, command, side="left", padx=(0, 8))
@@ -214,7 +253,7 @@ class App(tk.Tk):
         self.count.pack(side="right")
 
         main = ttk.Panedwindow(root, orient="horizontal")
-        main.pack(fill="both", expand=True, pady=(10, 8))
+        main.grid(row=3, column=0, sticky="nsew", pady=(10, 8))
         listing = ttk.Frame(main)
         main.add(listing, weight=1)
         self.tree = ttk.Treeview(listing, columns=("file", "status", "size"), show="headings", selectmode="extended", height=8)
@@ -253,7 +292,7 @@ class App(tk.Tk):
             main.sashpos(0, int(main.winfo_width() * .34))
 
         opts = ttk.Frame(root)
-        opts.pack(fill="x")
+        opts.grid(row=4, column=0, sticky="ew")
         self.mode = tk.StringVar(value=self._setting("mode", "自动识别"))
         if self.mode.get() not in ("自动识别", "原图直接转换"):
             self.mode.set("自动识别")
@@ -314,9 +353,23 @@ class App(tk.Tk):
                                                side="left", padx=(12, 0))
         self.subject_canvas_button = self._button(canvas_row, "裁到主体大小", self.use_subject_canvas,
                                                   side="left", padx=(8, 0))
+        threshold = self._setting("alpha_threshold", 1)
+        self.alpha_threshold = tk.StringVar(value=str(threshold if 0 <= threshold <= 254 else 1))
+        threshold_row = ttk.Frame(target_step)
+        threshold_row.pack(fill="x", pady=(8, 0))
+        ttk.Label(threshold_row, text="透明噪点阈值").pack(side="left", padx=(0, 8))
+        self.alpha_threshold_input = ttk.Spinbox(threshold_row, from_=0, to=254,
+                                                 textvariable=self.alpha_threshold, width=5)
+        self.alpha_threshold_input.pack(side="left")
+        self.controls.append((self.alpha_threshold_input, "normal"))
+        ttk.Label(threshold_row, text="0 关闭；忽略透明度不超过此值的外围杂点，仅用于主体裁边。",
+                  foreground="#555", wraplength=650).pack(side="left", padx=12)
         self.subject_caption = ttk.Label(target_step, text=info_text(None), foreground="#555",
                                          wraplength=820)
         self.subject_caption.pack(anchor="w", pady=(6, 0))
+        self.scale_caption = ttk.Label(target_step, text=scaling_text(None, None)[0],
+                                       foreground="#555", wraplength=820)
+        self.scale_caption.pack(anchor="w", pady=(5, 0))
         self.algorithm_step = ttk.LabelFrame(opts, text="3. 缩放算法", padding=8)
         self.algorithm_step.pack(fill="x", pady=(6, 0))
         algorithm_row = ttk.Frame(self.algorithm_step)
@@ -358,18 +411,18 @@ class App(tk.Tk):
         self.update_grid_state()
 
         actions = ttk.Frame(root)
-        actions.pack(fill="x", pady=(10, 6))
+        actions.grid(row=5, column=0, sticky="ew", pady=(10, 6))
         self.run_button = self._button(actions, "开始处理全部", self.start, side="left")
         self.cancel_button = ttk.Button(actions, text="取消", command=self.cancel, state="disabled")
         self.cancel_button.pack(side="left", padx=8)
         ttk.Button(actions, text="打开输出文件夹", command=self.open_output).pack(side="right")
         self.progress = ttk.Progressbar(root, mode="determinate")
-        self.progress.pack(fill="x")
+        self.progress.grid(row=6, column=0, sticky="ew")
         self.status = ttk.Label(root, text="就绪 · 原图保持不变，重名结果自动编号")
-        self.status.pack(anchor="w", pady=4)
+        self.status.grid(row=7, column=0, sticky="w", pady=4)
         details = ttk.Frame(root)
-        details.pack(fill="x")
-        self.details = tk.Text(details, height=4, wrap="word", state="disabled", font=("Microsoft YaHei UI", 9))
+        details.grid(row=8, column=0, sticky="ew")
+        self.details = tk.Text(details, height=2, wrap="word", state="disabled", font=("Microsoft YaHei UI", 9))
         scrollbar = ttk.Scrollbar(details, command=self.details.yview)
         self.details.configure(yscrollcommand=scrollbar.set)
         self.details.pack(side="left", fill="x", expand=True)
@@ -378,14 +431,15 @@ class App(tk.Tk):
     def update_grid_state(self):
         auto = self.mode.get() == "自动识别"
         self.method_input.configure(state="readonly" if not self.busy and auto else "disabled")
-        self.source_help.configure(text=("先还原图片的真实像素网格，再按下方布局与目标尺寸处理。" if auto else
+        self.source_help.configure(text=("自动识别图片的像素网格并处理，网格识别准确时效果最好；指定输出分辨率需配合缩放算法。" if auto else
                                         "跳过网格还原，直接使用原图；目标尺寸在第 2 步设置。"))
         layout, resample = LAYOUTS[self.layout.get()], RESAMPLERS[self.resample.get()]
         self.layout_help.configure(text=LAYOUT_HELP[layout])
         self.algorithm_help.configure(text=RESAMPLE_HELP[resample])
         canvas_state = "normal" if not self.busy and LAYOUTS[self.layout.get()] in ("keep", "fit", "canvas_fit", "stretch") else "disabled"
-        self.canvas_width_input.configure(state=canvas_state)
-        self.canvas_height_input.configure(state=canvas_state)
+        self.canvas_width_input.configure(state=canvas_state, to=canvas_limit(layout))
+        self.canvas_height_input.configure(state=canvas_state, to=canvas_limit(layout))
+        self.alpha_threshold_input.configure(state="disabled" if self.busy else "normal")
         converting = not self.busy and LAYOUTS[self.layout.get()] in ("fit", "canvas_fit", "stretch")
         self.resample_input.configure(state="readonly" if converting else "disabled")
         pixel_state = "readonly" if converting and RESAMPLERS[self.resample.get()] == "pixel" else "disabled"
@@ -406,7 +460,7 @@ class App(tk.Tk):
         self.subject_canvas_button.configure(state="normal" if not self.busy and info and info.subject else "disabled")
 
     def set_canvas_size(self, size):
-        if self.layout.get() in ("保持原画布", "只裁透明边 · 最小画布"):
+        if self.layout.get() == "保持原画布":
             self.layout.set("主体等比例缩放 · 改画布")
         self.canvas_width.set(str(size))
         self.canvas_height.set(str(size))
@@ -536,17 +590,21 @@ class App(tk.Tk):
 
     def get_options(self, for_preview=False):
         layout = LAYOUTS[self.layout.get()]
+        try:
+            alpha_threshold = int(self.alpha_threshold.get())
+        except ValueError:
+            raise ValueError("透明噪点阈值必须是 0～254 的整数；0 表示关闭") from None
         canvas = None
         if layout in ("keep", "fit", "canvas_fit", "stretch"):
             try:
                 canvas = int(self.canvas_width.get()), int(self.canvas_height.get())
             except ValueError:
-                raise ValueError("画布宽、高必须是 1～1024 的整数") from None
+                raise ValueError(f"画布宽、高必须是 1～{canvas_limit(layout)} 的整数") from None
         options = Options(method=METHODS[self.method.get()],
                           output_dir=Path(self.output_dir.get()).resolve() if self.output_dir.get() and not for_preview else None,
                           layout=layout, canvas=canvas, resample=RESAMPLERS[self.resample.get()],
                           palette_size=PALETTES[self.palette.get()], detail=DETAILS[self.detail.get()],
-                          direct=self.mode.get() == "原图直接转换")
+                          direct=self.mode.get() == "原图直接转换", alpha_threshold=alpha_threshold)
         options.validate()
         return options
 
@@ -685,6 +743,11 @@ class App(tk.Tk):
                 return
             self.current_info = extra[0] if extra else None
             self.subject_caption.configure(text=info_text(self.current_info))
+            try:
+                scale_text, attention = scaling_text(self.current_info, self.get_options(for_preview=True))
+            except ValueError:
+                scale_text, attention = "缩放提示：请先修正参数。", False
+            self.scale_caption.configure(text=scale_text, foreground="#9b4f00" if attention else "#555")
             self.update_grid_state()
             self.photos.clear()
             for value, view, caption, title in (
@@ -720,6 +783,7 @@ class App(tk.Tk):
         self.invalidate_preview()
         self.current_info = None
         self.subject_caption.configure(text=info_text(None))
+        self.scale_caption.configure(text=scaling_text(None, None)[0], foreground="#555")
         self.update_grid_state()
         token = self.preview_token
         selected = self.tree.selection()
@@ -808,9 +872,13 @@ class App(tk.Tk):
                     output_dir=self.output_dir.get(), geometry=f"{self.winfo_width()}x{self.winfo_height()}")
         for key, variable in (("canvas_width", self.canvas_width), ("canvas_height", self.canvas_height)):
             try:
-                data[key] = max(1, min(1024, int(variable.get())))
+                data[key] = max(1, min(canvas_limit(LAYOUTS[self.layout.get()]), int(variable.get())))
             except ValueError:
                 data[key] = 32
+        try:
+            data["alpha_threshold"] = max(0, min(254, int(self.alpha_threshold.get())))
+        except ValueError:
+            data["alpha_threshold"] = 1
         try:
             temp = SETTINGS.with_suffix(".tmp")
             temp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
