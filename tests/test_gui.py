@@ -20,8 +20,8 @@ class GuiIntegrationTests(unittest.TestCase):
         self.app = gui.App()
         self.app.withdraw()
         self.app.update()
-        self.app.set_size(4)
-        self.app.scale.set("不导出")
+        self.app.mode.set("原图直接转换")
+        self.app.set_canvas_size(4)
 
     def tearDown(self):
         if self.app.worker and self.app.worker.is_alive():
@@ -109,22 +109,37 @@ class GuiIntegrationTests(unittest.TestCase):
 
     def test_settings_reload_and_invalid_json(self):
         self.app.method.set("中位数 · 去噪")
-        self.app.set_size(64)
-        self.app.scale.set("4 倍")
+        self.app.set_canvas_size(64)
         self.app.layout.set("主体不缩放 · 改画布")
         self.app.canvas_width.set("42")
         self.app.canvas_height.set("40")
-        self.app.resample.set("平滑缩小 · 面积平均")
+        self.app.resample.set("像素硬边 · 最近邻")
         self.app.palette.set("16 色")
         self.app.detail.set("较强")
         self.app.save_settings()
         settings = gui.load_settings()
-        self.assertEqual(settings["width"], 64)
+        self.assertNotIn("width", settings)
+        self.assertNotIn("height", settings)
+        self.assertNotIn("scale", settings)
         self.assertEqual(settings["method"], "中位数 · 去噪")
         self.assertEqual(settings["layout"], "主体不缩放 · 改画布")
         self.assertEqual((settings["canvas_width"], settings["canvas_height"]), (42, 40))
-        self.assertEqual(settings["resample"], "平滑缩小 · 面积平均")
+        self.assertEqual(settings["resample"], "像素硬边 · 最近邻")
         self.assertEqual((settings["palette"], settings["detail"]), ("16 色", "较强"))
+        # A saved selection of the removed mode must recover on startup.
+        gui.SETTINGS.write_text(gui.json.dumps({**settings, "resample": "平滑缩小 · 面积平均", "scale": "16 倍"}),
+                                encoding="utf-8")
+        migrated = gui.App()
+        try:
+            migrated.withdraw()
+            self.assertEqual(migrated.resample.get(), "目标像素 · 结构保护")
+            self.assertNotIn("平滑缩小 · 面积平均", migrated.resample_input.cget("values"))
+            self.assertFalse(hasattr(migrated, "scale"))
+            migrated.save_settings()
+            self.assertNotIn("scale", gui.load_settings())
+        finally:
+            migrated.destroy()
+            migrated.preview_pool.shutdown(wait=True, cancel_futures=True)
         gui.SETTINGS.write_text("broken json", encoding="utf-8")
         self.assertEqual(gui.load_settings(), {})
 
@@ -135,21 +150,21 @@ class GuiIntegrationTests(unittest.TestCase):
         self.pump_until(lambda: "4 × 4" in self.app.output_caption.cget("text"))
         self.assertEqual(len(self.app.photos), 2)
         self.assertFalse((self.root / "perfect_pixel_output").exists())
-        self.app.set_size(8)
+        self.app.set_canvas_size(8)
         self.app.method.set("中位数 · 去噪")
         self.pump_until(lambda: "8 × 8" in self.app.output_caption.cget("text"))
-        self.assertIn(("median", (8, 8), False, False), self.app.preview_renderer.outputs)
+        self.assertIn(("median", None, True, True), self.app.preview_renderer.outputs)
         self.assertEqual(path.read_bytes(), original)
         self.assertFalse((self.root / "perfect_pixel_output").exists())
 
     def test_invalid_live_size_is_inline_and_recovers(self):
         path = self.image("参数.png")
         self.app.append_files([path])
-        self.app.width.set("")
+        self.app.canvas_width.set("")
         with patch.object(gui.messagebox, "showerror") as popup:
             self.pump_until(lambda: "参数有误" in self.app.output_view.cget("text"))
             self.assertFalse(popup.called)
-        self.app.width.set("8")
+        self.app.canvas_width.set("8")
         self.pump_until(lambda: "8 × 4" in self.app.output_caption.cget("text"))
 
     def test_rapid_changes_compute_only_final_options_and_ignore_stale_events(self):
@@ -157,7 +172,7 @@ class GuiIntegrationTests(unittest.TestCase):
         with patch.object(gui, "prepare_image", wraps=gui.prepare_image) as compute:
             self.app.append_files([path])
             for size in (3, 6, 8):
-                self.app.set_size(size)
+                self.app.set_canvas_size(size)
             self.pump_until(lambda: "8 × 8" in self.app.output_caption.cget("text"))
             self.assertEqual(compute.call_count, 1)
         caption = self.app.output_caption.cget("text")
@@ -194,6 +209,7 @@ class GuiIntegrationTests(unittest.TestCase):
         result = self.app.results[path_key(path)]
         self.assertEqual((result.width, result.height), (8, 8))
         self.assertEqual(gui.thumbnail(result.output), live)
+        self.assertEqual(list(result.output.parent.iterdir()), [result.output])
         self.app.resample.set("目标像素 · 结构保护")
         self.app.update_grid_state()
         self.assertEqual(str(self.app.palette_input.cget("state")), "readonly")
@@ -203,7 +219,7 @@ class GuiIntegrationTests(unittest.TestCase):
         image = np.zeros((16, 16, 4), np.uint8)
         image[3:13, 5:11] = [10, 40, 90, 255]
         cv2.imencode(".png", image)[1].tofile(path)
-        self.app.set_size(16)
+        self.app.set_canvas_size(16)
         self.app.append_files([path])
         self.pump_until(lambda: self.app.current_info is not None)
         self.assertIn("主体 6×10", self.app.subject_caption.cget("text"))
@@ -224,9 +240,9 @@ class GuiIntegrationTests(unittest.TestCase):
         self.pump_until(lambda: "8 × 8" in self.app.output_caption.cget("text"))
         self.assertEqual(self.app.get_options().resample, "pixel")
         self.assertEqual(str(self.app.resample_input.cget("state")), "readonly")
-        self.app.resample.set("平滑缩小 · 面积平均")
+        self.app.resample.set("像素硬边 · 最近邻")
         self.pump_until(lambda: "8 × 8" in self.app.output_caption.cget("text"))
-        self.assertEqual(self.app.get_options().resample, "area")
+        self.assertEqual(self.app.get_options().resample, "nearest")
         self.app.start()
         self.assertEqual(str(self.app.subject_canvas_button.cget("state")), "disabled")
         self.pump_until(lambda: not self.app.busy)
@@ -272,6 +288,74 @@ class GuiIntegrationTests(unittest.TestCase):
         np.testing.assert_array_equal(output, expected)
         self.assertEqual(path.read_bytes(), original)
 
+    def test_source_choices_use_auto_grid_or_direct_without_manual_size(self):
+        self.assertEqual([button.cget("value") for button in self.app.source_buttons],
+                         ["自动识别", "原图直接转换"])
+        self.assertFalse(hasattr(self.app, "width_input"))
+        path = self.image("输入方式.png")
+        self.app.layout.set("保持原画布")
+        self.app.mode.set("自动识别")
+        cuts = np.arange(0, 17, 4)
+        with patch("pixel_core.detect_grid_scale", return_value=(4, 4)) as detect, \
+             patch("pixel_core.refine_grids", return_value=(cuts, cuts)):
+            self.app.append_files([path])
+            self.pump_until(lambda: "4 × 4" in self.app.output_caption.cget("text"))
+            self.assertIn("网格 4×4", self.app.subject_caption.cget("text"))
+            self.assertEqual(str(self.app.method_input.cget("state")), "readonly")
+            self.assertIsNone(self.app.get_options().grid)
+            calls = detect.call_count
+            self.app.mode.set("原图直接转换")
+            self.pump_until(lambda: "16 × 16" in self.app.output_caption.cget("text"))
+            self.assertEqual(detect.call_count, calls)
+            self.assertEqual(str(self.app.method_input.cget("state")), "disabled")
+            self.assertTrue(self.app.get_options().direct)
+        self.assertEqual(self.app.algorithm_step.winfo_manager(), "")
+        self.app.set_canvas_size(32)
+        self.assertEqual(self.app.get_options().layout, "fit")
+        self.assertEqual(self.app.mode.get(), "原图直接转换")
+        self.assertEqual(self.app.algorithm_step.winfo_manager(), "pack")
+        self.app.resample.set("k-centroid · 局部主色")
+        self.assertEqual(self.app.pixel_row.winfo_manager(), "")
+        self.app.resample.set("目标像素 · 结构保护")
+        self.assertEqual(self.app.pixel_row.winfo_manager(), "pack")
+
+    def test_delete_edits_size_without_removing_the_selected_image(self):
+        path = self.image("快捷键.png")
+        self.app.append_files([path])
+        self.app.tree.selection_set(path_key(path))
+        self.app.deiconify()
+        self.app.update()
+        self.app.canvas_width.set("32")
+        entry = self.app.canvas_width_input
+        entry.focus_force()
+        entry.selection_range(0, 1)
+        entry.event_generate("<Delete>")
+        self.app.update()
+        self.assertEqual(self.app.canvas_width.get(), "2")
+        self.assertEqual(self.app.files, [path.resolve()])
+        self.app.tree.focus_force()
+        self.app.tree.event_generate("<Delete>")
+        self.app.update()
+        self.assertEqual(self.app.files, [])
+        self.assertTrue(path.exists())
+
+    def test_old_manual_size_migrates_to_auto_and_target_canvas(self):
+        gui.SETTINGS.write_text(gui.json.dumps({"mode": "指定尺寸", "width": 32, "height": 16}),
+                                encoding="utf-8")
+        migrated = gui.App()
+        try:
+            migrated.withdraw()
+            options = migrated.get_options()
+            self.assertEqual(migrated.mode.get(), "自动识别")
+            self.assertIsNone(options.grid)
+            self.assertEqual((options.layout, options.canvas), ("canvas_fit", (32, 16)))
+            migrated.save_settings()
+            self.assertNotIn("width", gui.load_settings())
+            self.assertNotIn("height", gui.load_settings())
+        finally:
+            migrated.destroy()
+            migrated.preview_pool.shutdown(wait=True, cancel_futures=True)
+
     def test_target_pixel_controls_and_block_direct_conversion(self):
         path = self.image("方块.png")
         self.app.append_files([path])
@@ -305,7 +389,7 @@ class PreviewRendererTests(unittest.TestCase):
             with patch.object(gui, "read_image", wraps=gui.read_image) as read:
                 with patch.object(gui, "prepare_image", wraps=gui.prepare_image) as compute:
                     for method in ("center", "median", "majority"):
-                        options = gui.Options(method=method, grid=(4, 4), preview_scale=0)
+                        options = gui.Options(method=method, grid=(4, 4))
                         _, preview, info = renderer.render(path, options, 80, 80, cancel)
                         saved = process_file(path, options)
                         self.assertEqual(preview, gui.thumbnail(saved.output, 80, 80))
@@ -328,16 +412,16 @@ class PreviewRendererTests(unittest.TestCase):
             with patch.object(gui, "prepare_image", wraps=gui.prepare_image) as compute:
                 for layout, canvas, resample in (("original", None, "nearest"), ("crop", None, "nearest"),
                                        ("keep", (12, 14), "nearest"), ("fit", (8, 8), "nearest"),
-                                       ("fit", (8, 8), "area"), ("fit", (8, 8), "pixel"),
+                                       ("fit", (8, 8), "pixel"),
                                        ("canvas_fit", (12, 8), "nearest"),
-                                       ("canvas_fit", (8, 12), "area"),
+                                       ("canvas_fit", (8, 12), "nearest"),
                                        ("canvas_fit", (12, 8), "pixel"),
                                        ("stretch", (8, 8), "pixel"),
                                        ("fit", (8, 8), "k-centroid"),
                                        ("canvas_fit", (12, 8), "k-centroid"),
                                        ("stretch", (8, 12), "k-centroid")):
                     options = gui.Options(grid=(16, 16), layout=layout, canvas=canvas,
-                                          resample=resample, preview_scale=0)
+                                          resample=resample)
                     _, preview, info = renderer.render(path, options, 80, 80, threading.Event())
                     self.assertEqual(info.subject, (6, 10))
                     result = process_file(path, options)

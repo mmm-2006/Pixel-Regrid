@@ -14,7 +14,7 @@ class KCentroidTests(unittest.TestCase):
         image[:, 1] = 250
         out = k_centroid_pixels(image, (2, 2))
         np.testing.assert_array_equal(out, np.full((2, 2, 3), 20, np.uint8))
-        self.assertGreater(cv2.resize(image, (2, 2), interpolation=cv2.INTER_AREA)[0, 0, 0], 20)
+        self.assertGreater(image[:4, :4, 0].mean(), 20)
 
     def test_fractional_footprints_use_area_not_rounded_pixel_counts(self):
         image = np.array([[[250, 250, 250], [20, 20, 20], [20, 20, 20]]], np.uint8)

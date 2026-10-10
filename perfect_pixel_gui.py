@@ -27,15 +27,27 @@ from pixel_core import (Options, SUPPORTED, layout_image, path_key,
 HERE = Path(__file__).resolve().parent
 SETTINGS = HERE / "perfect_pixel_settings.json"
 METHODS = {"中心取样 · 快速": "center", "中位数 · 去噪": "median", "多数色 · 较慢": "majority"}
-SCALES = {"不导出": 0, "2 倍": 2, "4 倍": 4, "8 倍": 8, "16 倍": 16}
 LAYOUTS = {"保持原画布": "original", "只裁透明边 · 最小画布": "crop",
            "主体不缩放 · 改画布": "keep", "主体等比例缩放 · 改画布": "fit",
            "整图等比例缩放 · 保留原留白": "canvas_fit",
            "方块铺满 · 改尺寸": "stretch"}
 RESAMPLERS = {"目标像素 · 结构保护": "pixel", "像素硬边 · 最近邻": "nearest",
-              "平滑缩小 · 面积平均": "area", "k-centroid · 局部主色": "k-centroid"}
+              "k-centroid · 局部主色": "k-centroid"}
 PALETTES = {"保留颜色": 0, "8 色": 8, "16 色": 16, "32 色": 32, "64 色": 64}
 DETAILS = {"关闭": 0, "适中": 1, "较强": 2}
+LAYOUT_HELP = {
+    "original": "保留完整网格或原图，不改变尺寸。要输出 32×32，请选择下方尺寸预设。",
+    "crop": "只裁掉外围透明留白，主体像素保持原样。",
+    "keep": "主体像素保持原样，居中放入目标画布；画布不能小于主体。",
+    "fit": "先裁透明留白，再等比例缩放主体；适合物品图标。",
+    "canvas_fit": "主体和原有留白一起等比例缩放；比例不同时补透明边。",
+    "stretch": "整张图铺满目标宽高；适合方块贴图，宽高比例不同时会拉伸。",
+}
+RESAMPLE_HELP = {
+    "pixel": "优先保护细线与小色块；减少颜色数可能丢失高光，较强保护也可能保留噪点。",
+    "nearest": "保持像素硬边和原有颜色；缩小可能丢失细线。",
+    "k-centroid": "选择局部主色，得到明确色块；少量高光和细线可能被舍弃。",
+}
 
 
 def info_text(info):
@@ -131,6 +143,15 @@ class App(tk.Tk):
         self.geometry("1060x930")
         self.minsize(880, 820)
         self.settings = load_settings()
+        # Retire uniform manual-grid sampling, preserving its final size as a
+        # target canvas only when the old layout did not already specify one.
+        if self.settings.get("mode") == "指定尺寸":
+            self.settings["mode"] = "自动识别"
+            if self.settings.get("layout", "保持原画布") in ("保持原画布", "只裁透明边 · 最小画布"):
+                self.settings["layout"] = "整图等比例缩放 · 保留原留白"
+                for axis in ("width", "height"):
+                    value = self.settings.get(axis, 32)
+                    self.settings["canvas_" + axis] = value if type(value) is int and 1 <= value <= 1024 else 32
         geometry = self.settings.get("geometry", "")
         if isinstance(geometry, str):
             import re
@@ -155,12 +176,12 @@ class App(tk.Tk):
         self.preview_cancel = threading.Event()
         self.preview_renderer = PreviewRenderer()
         self._ui()
-        for variable in (self.mode, self.width, self.height, self.method,
+        for variable in (self.mode, self.method,
                          self.layout, self.canvas_width, self.canvas_height, self.resample,
                          self.palette, self.detail):
             variable.trace_add("write", self.preview_options_changed)
         self.protocol("WM_DELETE_WINDOW", self.close)
-        self.bind("<Delete>", lambda _: self.remove_selected())
+        self.tree.bind("<Delete>", lambda _: self.remove_selected())
         self.bind("<Control-o>", lambda _: self.add_files())
         self.bind("<Control-a>", self.select_all)
         self.poll_id = self.after(80, self.poll)
@@ -195,9 +216,9 @@ class App(tk.Tk):
         main = ttk.Panedwindow(root, orient="horizontal")
         main.pack(fill="both", expand=True, pady=(10, 8))
         listing = ttk.Frame(main)
-        main.add(listing, weight=3)
+        main.add(listing, weight=1)
         self.tree = ttk.Treeview(listing, columns=("file", "status", "size"), show="headings", selectmode="extended", height=8)
-        for name, text, width in (("file", "图片", 300), ("status", "状态", 95), ("size", "输出尺寸", 85)):
+        for name, text, width in (("file", "图片", 200), ("status", "状态", 75), ("size", "输出尺寸", 75)):
             self.tree.heading(name, text=text)
             self.tree.column(name, width=width, minwidth=60, stretch=name == "file")
         self.tree.tag_configure("error", foreground="#af2020")
@@ -213,76 +234,70 @@ class App(tk.Tk):
         self.tree.bind("<<TreeviewSelect>>", self.show_selection)
         preview = ttk.Frame(main, padding=(12, 0, 0, 0))
         main.add(preview, weight=2)
-        self.original_caption = ttk.Label(preview, text="原图", anchor="center")
+        ttk.Label(preview, text="调整参数自动更新预览 · 点击开始处理才保存文件",
+                  anchor="center", foreground="#555").pack(side="bottom", fill="x", pady=(6, 0))
+        original_panel = ttk.Frame(preview)
+        original_panel.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        output_panel = ttk.Frame(preview)
+        output_panel.pack(side="left", fill="both", expand=True)
+        self.original_caption = ttk.Label(original_panel, text="原图", anchor="center")
         self.original_caption.pack(fill="x")
-        self.original_view = ttk.Label(preview, text="选择图片查看预览", anchor="center")
+        self.original_view = ttk.Label(original_panel, text="选择图片查看预览", anchor="center")
         self.original_view.pack(fill="both", expand=True)
-        self.output_caption = ttk.Label(preview, text="实时预览 · 最近邻显示", anchor="center")
-        self.output_caption.pack(fill="x", pady=(8, 0))
-        self.output_view = ttk.Label(preview, text="选择图片后自动预览", anchor="center")
+        self.output_caption = ttk.Label(output_panel, text="实时预览 · 最近邻显示", anchor="center")
+        self.output_caption.pack(fill="x")
+        self.output_view = ttk.Label(output_panel, text="选择图片后自动预览", anchor="center")
         self.output_view.pack(fill="both", expand=True)
-        ttk.Label(preview, text="调整尺寸 / 取样方式自动更新\n点击开始处理才保存文件", anchor="center", foreground="#555").pack(fill="x", pady=(6, 0))
+        main.update_idletasks()
+        if main.winfo_width() > 100:
+            main.sashpos(0, int(main.winfo_width() * .34))
 
-        opts = ttk.LabelFrame(root, text="处理选项", padding=10)
+        opts = ttk.Frame(root)
         opts.pack(fill="x")
         self.mode = tk.StringVar(value=self._setting("mode", "自动识别"))
-        if self.mode.get() not in ("自动识别", "指定尺寸", "原图直接转换"):
+        if self.mode.get() not in ("自动识别", "原图直接转换"):
             self.mode.set("自动识别")
-        self.width = tk.StringVar(value=str(self._setting("width", 32)))
-        self.height = tk.StringVar(value=str(self._setting("height", 32)))
         self.method = tk.StringVar(value=self._setting("method", next(iter(METHODS))))
         if self.method.get() not in METHODS:
             self.method.set(next(iter(METHODS)))
-        self.scale = tk.StringVar(value=self._setting("scale", "8 倍"))
-        if self.scale.get() not in SCALES:
-            self.scale.set("8 倍")
-        first = ttk.Frame(opts)
+        source_step = ttk.LabelFrame(opts, text="1. 输入方式", padding=8)
+        source_step.pack(fill="x")
+        first = ttk.Frame(source_step)
         first.pack(fill="x")
-        mode = ttk.Combobox(first, textvariable=self.mode,
-                            values=("自动识别", "指定尺寸", "原图直接转换"), width=13, state="readonly")
-        mode.pack(side="left")
-        self.controls.append((mode, "readonly"))
-        mode.bind("<<ComboboxSelected>>", lambda _: self.update_grid_state())
-        ttk.Label(first, text="网格宽 × 高").pack(side="left", padx=(12, 6))
-        self.width_input = ttk.Spinbox(first, from_=1, to=1024, textvariable=self.width, width=5)
-        self.width_input.pack(side="left")
-        ttk.Label(first, text=" × ").pack(side="left")
-        self.height_input = ttk.Spinbox(first, from_=1, to=1024, textvariable=self.height, width=5)
-        self.height_input.pack(side="left")
-        self.controls.extend(((self.width_input, "normal"), (self.height_input, "normal")))
-        for size in (16, 32, 64, 128):
-            self._button(first, str(size), lambda n=size: self.set_size(n), side="left", padx=(5, 0))
-        second = ttk.Frame(opts)
-        second.pack(fill="x", pady=(8, 0))
-        ttk.Label(second, text="取样方式").pack(side="left")
-        combo = ttk.Combobox(second, textvariable=self.method, values=tuple(METHODS), width=20, state="readonly")
-        combo.pack(side="left", padx=(8, 20))
-        self.controls.append((combo, "readonly"))
-        ttk.Label(second, text="导出放大图").pack(side="left")
-        combo = ttk.Combobox(second, textvariable=self.scale, values=tuple(SCALES), width=9, state="readonly")
-        combo.pack(side="left", padx=8)
-        self.controls.append((combo, "readonly"))
+        self.source_buttons = []
+        for label in ("自动识别", "原图直接转换"):
+            button = ttk.Radiobutton(first, text=label, variable=self.mode, value=label)
+            button.pack(side="left", padx=(0, 18))
+            self.controls.append((button, "normal"))
+            self.source_buttons.append(button)
+        ttk.Label(first, text="网格取样").pack(side="left", padx=(16, 0))
+        self.method_input = ttk.Combobox(first, textvariable=self.method, values=tuple(METHODS), width=20, state="readonly")
+        self.method_input.pack(side="left", padx=8)
+        self.controls.append((self.method_input, "readonly"))
+        self.source_help = ttk.Label(source_step, foreground="#555", wraplength=820)
+        self.source_help.pack(anchor="w", pady=(5, 0))
         self.resample = tk.StringVar(value=self._setting("resample", next(iter(RESAMPLERS))))
         if self.resample.get() not in RESAMPLERS:
             self.resample.set(next(iter(RESAMPLERS)))
-        ttk.Label(second, text="转换方式").pack(side="left", padx=(12, 0))
-        self.resample_input = ttk.Combobox(second, textvariable=self.resample,
-                                          values=tuple(RESAMPLERS), width=21, state="readonly")
-        self.resample_input.pack(side="left", padx=(8, 0))
-        self.controls.append((self.resample_input, "readonly"))
         self.layout = tk.StringVar(value=self._setting("layout", "保持原画布"))
         if self.layout.get() not in LAYOUTS:
             self.layout.set("保持原画布")
         self.canvas_width = tk.StringVar(value=str(self._setting("canvas_width", 32)))
         self.canvas_height = tk.StringVar(value=str(self._setting("canvas_height", 32)))
-        canvas_row = ttk.Frame(opts)
-        canvas_row.pack(fill="x", pady=(8, 0))
-        ttk.Label(canvas_row, text="主体 / 画布").pack(side="left")
-        combo = ttk.Combobox(canvas_row, textvariable=self.layout, values=tuple(LAYOUTS),
-                             width=25, state="readonly")
+        target_step = ttk.LabelFrame(opts, text="2. 输出布局与目标尺寸", padding=8)
+        target_step.pack(fill="x", pady=(6, 0))
+        layout_row = ttk.Frame(target_step)
+        layout_row.pack(fill="x")
+        ttk.Label(layout_row, text="输出方式").pack(side="left")
+        combo = ttk.Combobox(layout_row, textvariable=self.layout, values=tuple(LAYOUTS),
+                             width=30, state="readonly")
         combo.pack(side="left", padx=(8, 12))
         self.controls.append((combo, "readonly"))
-        ttk.Label(canvas_row, text="画布宽 × 高").pack(side="left", padx=(0, 6))
+        self.layout_help = ttk.Label(layout_row, foreground="#555", wraplength=470)
+        self.layout_help.pack(side="left", fill="x", expand=True)
+        canvas_row = ttk.Frame(target_step)
+        canvas_row.pack(fill="x", pady=(8, 0))
+        ttk.Label(canvas_row, text="目标画布宽 × 高").pack(side="left", padx=(0, 6))
         self.canvas_width_input = ttk.Spinbox(canvas_row, from_=1, to=1024,
                                               textvariable=self.canvas_width, width=5)
         self.canvas_width_input.pack(side="left")
@@ -292,16 +307,33 @@ class App(tk.Tk):
         self.canvas_height_input.pack(side="left")
         self.controls.extend(((self.canvas_width_input, "normal"),
                               (self.canvas_height_input, "normal")))
-        for size in (16, 32, 64):
-            self._button(canvas_row, str(size), lambda n=size: self.set_canvas_size(n),
+        for size in (16, 32, 64, 128):
+            self._button(canvas_row, f"{size}×{size}", lambda n=size: self.set_canvas_size(n),
                          side="left", padx=(5, 0))
+        self.grid_canvas_button = self._button(canvas_row, "用输入尺寸", self.use_grid_canvas,
+                                               side="left", padx=(12, 0))
+        self.subject_canvas_button = self._button(canvas_row, "裁到主体大小", self.use_subject_canvas,
+                                                  side="left", padx=(8, 0))
+        self.subject_caption = ttk.Label(target_step, text=info_text(None), foreground="#555",
+                                         wraplength=820)
+        self.subject_caption.pack(anchor="w", pady=(6, 0))
+        self.algorithm_step = ttk.LabelFrame(opts, text="3. 缩放算法", padding=8)
+        self.algorithm_step.pack(fill="x", pady=(6, 0))
+        algorithm_row = ttk.Frame(self.algorithm_step)
+        algorithm_row.pack(fill="x")
+        self.resample_input = ttk.Combobox(algorithm_row, textvariable=self.resample,
+                                          values=tuple(RESAMPLERS), width=23, state="readonly")
+        self.resample_input.pack(side="left")
+        self.controls.append((self.resample_input, "readonly"))
+        self.algorithm_help = ttk.Label(algorithm_row, foreground="#555", wraplength=600)
+        self.algorithm_help.pack(side="left", padx=12, fill="x", expand=True)
         self.palette = tk.StringVar(value=self._setting("palette", "32 色"))
         if self.palette.get() not in PALETTES:
             self.palette.set("32 色")
         self.detail = tk.StringVar(value=self._setting("detail", "适中"))
         if self.detail.get() not in DETAILS:
             self.detail.set("适中")
-        pixel_row = ttk.Frame(opts)
+        pixel_row = self.pixel_row = ttk.Frame(self.algorithm_step)
         pixel_row.pack(fill="x", pady=(8, 0))
         ttk.Label(pixel_row, text="目标像素颜色").pack(side="left")
         self.palette_input = ttk.Combobox(pixel_row, textvariable=self.palette,
@@ -312,19 +344,11 @@ class App(tk.Tk):
                                          values=tuple(DETAILS), width=8, state="readonly")
         self.detail_input.pack(side="left", padx=8)
         self.controls.extend(((self.palette_input, "readonly"), (self.detail_input, "readonly")))
-        ttk.Label(pixel_row, text="保护细线与小色块；较强也可能保留噪点。", foreground="#555").pack(side="left", padx=(8, 0))
-        subject_row = ttk.Frame(opts)
-        subject_row.pack(fill="x", pady=(6, 0))
-        self.subject_caption = ttk.Label(subject_row, text=info_text(None), foreground="#555",
-                                         wraplength=550)
-        self.subject_caption.pack(side="left", fill="x", expand=True)
-        self.grid_canvas_button = self._button(subject_row, "用网格尺寸", self.use_grid_canvas,
-                                               side="left", padx=(8, 0))
-        self.subject_canvas_button = self._button(subject_row, "用主体尺寸", self.use_subject_canvas,
-                                                  side="left", padx=(8, 0))
         self.output_dir = tk.StringVar(value=self._setting("output_dir", ""))
-        destination = ttk.Frame(opts)
-        destination.pack(fill="x", pady=(8, 0))
+        self.export_step = ttk.LabelFrame(opts, text="保存", padding=8)
+        self.export_step.pack(fill="x", pady=(6, 0))
+        destination = ttk.Frame(self.export_step)
+        destination.pack(fill="x")
         ttk.Label(destination, text="保存位置").pack(side="left")
         self.destination_label = ttk.Label(destination, text="", foreground="#555", width=55)
         self.destination_label.pack(side="left", fill="x", expand=True, padx=8)
@@ -351,16 +375,14 @@ class App(tk.Tk):
         self.details.pack(side="left", fill="x", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-    def set_size(self, size):
-        self.mode.set("指定尺寸")
-        self.width.set(str(size))
-        self.height.set(str(size))
-        self.update_grid_state()
-
     def update_grid_state(self):
-        state = "normal" if not self.busy and self.mode.get() == "指定尺寸" else "disabled"
-        self.width_input.configure(state=state)
-        self.height_input.configure(state=state)
+        auto = self.mode.get() == "自动识别"
+        self.method_input.configure(state="readonly" if not self.busy and auto else "disabled")
+        self.source_help.configure(text=("先还原图片的真实像素网格，再按下方布局与目标尺寸处理。" if auto else
+                                        "跳过网格还原，直接使用原图；目标尺寸在第 2 步设置。"))
+        layout, resample = LAYOUTS[self.layout.get()], RESAMPLERS[self.resample.get()]
+        self.layout_help.configure(text=LAYOUT_HELP[layout])
+        self.algorithm_help.configure(text=RESAMPLE_HELP[resample])
         canvas_state = "normal" if not self.busy and LAYOUTS[self.layout.get()] in ("keep", "fit", "canvas_fit", "stretch") else "disabled"
         self.canvas_width_input.configure(state=canvas_state)
         self.canvas_height_input.configure(state=canvas_state)
@@ -369,13 +391,23 @@ class App(tk.Tk):
         pixel_state = "readonly" if converting and RESAMPLERS[self.resample.get()] == "pixel" else "disabled"
         self.palette_input.configure(state=pixel_state)
         self.detail_input.configure(state=pixel_state)
+        if layout in ("fit", "canvas_fit", "stretch"):
+            if not self.algorithm_step.winfo_manager():
+                self.algorithm_step.pack(fill="x", pady=(6, 0), before=self.export_step)
+        else:
+            self.algorithm_step.pack_forget()
+        if layout in ("fit", "canvas_fit", "stretch") and resample == "pixel":
+            if not self.pixel_row.winfo_manager():
+                self.pixel_row.pack(fill="x", pady=(8, 0))
+        else:
+            self.pixel_row.pack_forget()
         info = self.current_info
         self.grid_canvas_button.configure(state="normal" if not self.busy and info else "disabled")
         self.subject_canvas_button.configure(state="normal" if not self.busy and info and info.subject else "disabled")
 
     def set_canvas_size(self, size):
         if self.layout.get() in ("保持原画布", "只裁透明边 · 最小画布"):
-            self.layout.set("主体不缩放 · 改画布")
+            self.layout.set("主体等比例缩放 · 改画布")
         self.canvas_width.set(str(size))
         self.canvas_height.set(str(size))
 
@@ -503,12 +535,6 @@ class App(tk.Tk):
         self.update_grid_state()
 
     def get_options(self, for_preview=False):
-        grid = None
-        if self.mode.get() == "指定尺寸":
-            try:
-                grid = int(self.width.get()), int(self.height.get())
-            except ValueError:
-                raise ValueError("输出宽、高必须是 1～1024 的整数") from None
         layout = LAYOUTS[self.layout.get()]
         canvas = None
         if layout in ("keep", "fit", "canvas_fit", "stretch"):
@@ -516,9 +542,8 @@ class App(tk.Tk):
                 canvas = int(self.canvas_width.get()), int(self.canvas_height.get())
             except ValueError:
                 raise ValueError("画布宽、高必须是 1～1024 的整数") from None
-        options = Options(METHODS[self.method.get()], grid,
-                          0 if for_preview else SCALES[self.scale.get()],
-                          Path(self.output_dir.get()).resolve() if self.output_dir.get() and not for_preview else None,
+        options = Options(method=METHODS[self.method.get()],
+                          output_dir=Path(self.output_dir.get()).resolve() if self.output_dir.get() and not for_preview else None,
                           layout=layout, canvas=canvas, resample=RESAMPLERS[self.resample.get()],
                           palette_size=PALETTES[self.palette.get()], detail=DETAILS[self.detail.get()],
                           direct=self.mode.get() == "原图直接转换")
@@ -774,12 +799,14 @@ class App(tk.Tk):
 
     def save_settings(self):
         data = dict(self.settings)
-        data.update(mode=self.mode.get(), method=self.method.get(), scale=self.scale.get(),
+        data.pop("width", None)
+        data.pop("height", None)
+        data.pop("scale", None)
+        data.update(mode=self.mode.get(), method=self.method.get(),
                     layout=self.layout.get(), resample=self.resample.get(),
                     palette=self.palette.get(), detail=self.detail.get(),
                     output_dir=self.output_dir.get(), geometry=f"{self.winfo_width()}x{self.winfo_height()}")
-        for key, variable in (("width", self.width), ("height", self.height),
-                              ("canvas_width", self.canvas_width), ("canvas_height", self.canvas_height)):
+        for key, variable in (("canvas_width", self.canvas_width), ("canvas_height", self.canvas_height)):
             try:
                 data[key] = max(1, min(1024, int(variable.get())))
             except ValueError:

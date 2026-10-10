@@ -25,15 +25,15 @@ class PixelCoreTests(unittest.TestCase):
         encoded.tofile(path)
         return path
 
-    def test_unicode_path_and_nearest_preview(self):
+    def test_unicode_path_exports_only_one_target_size_png(self):
         image = np.arange(8 * 12 * 3, dtype=np.uint8).reshape(8, 12, 3)
         path = self.write("中文 文件夹/贴图.png", image)
         original = path.read_bytes()
-        result = core.process_file(path, core.Options(grid=(6, 4), preview_scale=4))
+        result = core.process_file(path, core.Options(grid=(6, 4)))
         self.assertEqual((result.width, result.height), (6, 4))
         out = core.read_image(result.output)
-        np.testing.assert_array_equal(core.read_image(result.preview),
-                                      out.repeat(4, axis=0).repeat(4, axis=1))
+        self.assertEqual(out.shape, (4, 6, 3))
+        self.assertEqual(list(result.output.parent.iterdir()), [result.output])
         self.assertEqual(path.read_bytes(), original)
 
     def test_manual_grid_full_extent_all_methods(self):
@@ -58,7 +58,7 @@ class PixelCoreTests(unittest.TestCase):
         path = self.write("透明.png", image)
         result = core.process_file(path, core.Options(grid=(2, 2)))
         np.testing.assert_array_equal(core.read_image(result.output), expected)
-        self.assertEqual(core.read_image(result.preview).shape[2], 4)
+        self.assertEqual(core.read_image(result.output).shape[2], 4)
 
     def test_transparent_hidden_colors_do_not_pollute_visible_color(self):
         image = np.full((8, 8, 4), [255, 0, 0, 0], dtype=np.uint8)
@@ -72,44 +72,35 @@ class PixelCoreTests(unittest.TestCase):
         png = self.write("test.png", image)
         bmp = self.write("test.bmp", image)
         first = core.process_file(png, core.Options(grid=(4, 4)))
-        old = first.output.read_bytes(), first.preview.read_bytes()
+        old = first.output.read_bytes()
         second = core.process_file(bmp, core.Options(grid=(4, 4)))
         third = core.process_file(png, core.Options(grid=(4, 4)))
         self.assertEqual(len({first.output, second.output, third.output}), 3)
-        self.assertEqual(old, (first.output.read_bytes(), first.preview.read_bytes()))
+        self.assertEqual(old, first.output.read_bytes())
         self.assertIn("_2", second.output.stem)
-        self.assertTrue(second.preview.stem.startswith(second.output.stem))
+        self.assertEqual(len(list(first.output.parent.iterdir())), 3)
 
-    def test_existing_preview_also_reserves_a_new_pair(self):
+    def test_existing_legacy_preview_is_preserved_without_blocking_output(self):
         dest = self.root / "out"
         dest.mkdir()
         existing = dest / "a_perfect_2x2_preview_8x.png"
         existing.write_bytes(b"keep me")
-        main, preview = core.save_outputs(dest, "a", np.zeros((2, 2, 3), np.uint8), 8)
-        self.assertIn("_2", main.stem)
-        self.assertTrue(preview.stem.startswith(main.stem))
+        main = core.save_output(dest, "a", np.zeros((2, 2, 3), np.uint8))
+        self.assertEqual(main.name, "a_perfect_2x2.png")
         self.assertEqual(existing.read_bytes(), b"keep me")
-        self.assertFalse((dest / "a_perfect_2x2.png").exists())
+        self.assertEqual(set(dest.iterdir()), {main, existing})
 
     def test_write_failure_removes_partial_outputs_and_temps(self):
         dest = self.root / "out"
-        original_replace = core.os.replace
-        calls = 0
-        def fail_second(source, target):
-            nonlocal calls
-            calls += 1
-            if calls == 2:
-                raise OSError("模拟磁盘写入失败")
-            return original_replace(source, target)
-        with patch.object(core.os, "replace", side_effect=fail_second):
+        with patch.object(core.os, "replace", side_effect=OSError("模拟磁盘写入失败")):
             with self.assertRaisesRegex(OSError, "磁盘"):
-                core.save_outputs(dest, "a", np.zeros((2, 2, 3), np.uint8), 8)
+                core.save_output(dest, "a", np.zeros((2, 2, 3), np.uint8))
         self.assertEqual(list(dest.iterdir()), [])
 
     def test_encode_failure_reports_no_success(self):
         with patch.object(core.cv2, "imencode", return_value=(False, None)):
             with self.assertRaisesRegex(OSError, "编码"):
-                core.save_outputs(self.root / "out", "a", np.zeros((2, 2, 3), np.uint8), 8)
+                core.save_output(self.root / "out", "a", np.zeros((2, 2, 3), np.uint8))
 
     def test_scan_prunes_outputs_hidden_and_custom_folder(self):
         image = np.zeros((8, 8, 3), np.uint8)
@@ -139,20 +130,17 @@ class PixelCoreTests(unittest.TestCase):
                 core.process_file(path, core.Options())
         self.assertFalse((self.root / core.OUTPUT_FOLDER).exists())
 
-    def test_invalid_grid_and_oversized_preview(self):
+    def test_invalid_grid_is_rejected(self):
         for grid in ((0, 16), (16, -1), (1025, 16), (2.5, 3)):
             with self.assertRaises(ValueError):
                 core.Options(grid=grid).validate()
         image = np.zeros((8, 8, 3), np.uint8)
         with self.assertRaisesRegex(ValueError, "大于原图"):
             core.refine_image(image, core.Options(grid=(16, 16)))
-        with patch.object(core, "MAX_PREVIEW_PIXELS", 8):
-            with self.assertRaisesRegex(ValueError, "预览"):
-                core.save_outputs(self.root / "out", "a", image, 8)
 
     def test_auto_failure_has_actionable_message(self):
         with patch.object(core, "detect_grid_scale", return_value=(None, None)):
-            with self.assertRaisesRegex(ValueError, "指定尺寸"):
+            with self.assertRaisesRegex(ValueError, "原图直接转换"):
                 core.refine_image(np.zeros((32, 32, 3), np.uint8), core.Options())
 
     def test_long_sampling_can_cancel_between_rows(self):
@@ -194,7 +182,7 @@ class PixelCoreTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "至少为 20×35"):
                 core.layout_image(image, core.Options(layout="keep", canvas=canvas))
 
-    def test_fit_keeps_aspect_and_premultiplied_color_at_transparent_edges(self):
+    def test_fit_keeps_aspect_and_visible_colors(self):
         image = np.zeros((12, 12, 4), np.uint8)
         image[2:10, 3:9] = [10, 40, 200, 255]
         for canvas, expected in (((4, 4), (3, 4)), ((12, 12), (9, 12))):
@@ -203,10 +191,6 @@ class PixelCoreTests(unittest.TestCase):
             self.assertEqual(core.image_info(out).subject, expected)
             visible = out[out[..., 3] > 0]
             np.testing.assert_array_equal(visible[:, :3], np.tile([10, 40, 200], (len(visible), 1)))
-        edge = np.array([[[0, 0, 200, 255], [0, 255, 0, 0]],
-                         [[0, 255, 0, 0], [0, 0, 200, 255]]], np.uint8)
-        out = core.layout_image(edge, core.Options(layout="fit", canvas=(1, 1), resample="area"))
-        np.testing.assert_array_equal(out[0, 0], [0, 0, 200, 128])
 
     def test_default_pixel_scaling_adds_no_colors_or_transparency_levels(self):
         image = np.zeros((35, 20, 4), np.uint8)
@@ -222,8 +206,6 @@ class PixelCoreTests(unittest.TestCase):
         result_values = {tuple(v) for v in out.reshape(-1, 4)}
         self.assertTrue(result_values <= original_values)
         self.assertEqual(set(np.unique(out[..., 3])), {0, 255})
-        smooth = core.layout_image(image, core.Options(layout="fit", canvas=(32, 32), resample="area"))
-        self.assertTrue(any(tuple(v) not in original_values for v in smooth.reshape(-1, 4)))
 
     def test_canvas_fit_preserves_original_margins_and_off_center_position(self):
         portrait = np.zeros((12, 8, 4), np.uint8)
@@ -237,7 +219,7 @@ class PixelCoreTests(unittest.TestCase):
                  (square, (4, 4), (1, 1, 2, 2)))
         for image, canvas, bounds in cases:
             with self.subTest(canvas=canvas, source=image.shape):
-                for resample in ("nearest", "area", "pixel"):
+                for resample in ("nearest", "pixel", "k-centroid"):
                     out = core.layout_image(image, core.Options(
                         layout="canvas_fit", canvas=canvas, resample=resample,
                         palette_size=0, detail=0))
@@ -255,7 +237,7 @@ class PixelCoreTests(unittest.TestCase):
         self.assertTrue(np.all(out[:, :5] == 0))
         self.assertTrue(np.all(out[:, 26:] == 0))
         empty = np.zeros((12, 8, 4), np.uint8)
-        for resample in ("nearest", "area", "pixel"):
+        for resample in ("nearest", "pixel", "k-centroid"):
             out = core.layout_image(empty, core.Options(
                 layout="canvas_fit", canvas=(10, 6), resample=resample))
             np.testing.assert_array_equal(out, np.zeros((6, 10, 4), np.uint8))
@@ -277,6 +259,7 @@ class PixelCoreTests(unittest.TestCase):
     def test_canvas_validation_and_export_metadata(self):
         for options in (core.Options(layout="unknown"), core.Options(layout="keep"),
                         core.Options(layout="canvas_fit"), core.Options(resample="bad"),
+                        core.Options(resample="area"),
                         core.Options(canvas=(0, 2)), core.Options(canvas=(3, 1025)),
                         core.Options(canvas=(True, 2)), core.Options(canvas=(2.5, 2))):
             with self.assertRaises(ValueError):
@@ -284,7 +267,7 @@ class PixelCoreTests(unittest.TestCase):
         image = np.zeros((8, 8, 4), np.uint8)
         image[2:6, 3:5] = [10, 30, 200, 128]
         path = self.write("画布.png", image)
-        options = core.Options(grid=(8, 8), layout="keep", canvas=(6, 8), preview_scale=2)
+        options = core.Options(grid=(8, 8), layout="keep", canvas=(6, 8))
         result = core.process_file(path, options)
         self.assertEqual(result.info.subject, (2, 4))
         self.assertEqual(result.info.grid, (8, 8))

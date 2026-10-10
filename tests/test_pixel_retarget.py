@@ -90,7 +90,7 @@ class TargetPixelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "source.png"
             cv2.imencode(".png", image)[1].tofile(path)
-            options = core.Options(direct=True, layout="fit", canvas=(16, 16), resample="pixel", preview_scale=2)
+            options = core.Options(direct=True, layout="fit", canvas=(16, 16), resample="pixel")
             result = core.process_file(path, options)
             np.testing.assert_array_equal(core.read_image(result.output), core.refine_image(image, options))
             self.assertEqual(result.info.recovery, "direct")

@@ -16,7 +16,6 @@ from perfect_pixel.perfect_pixel import (
 SUPPORTED = {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"}
 OUTPUT_FOLDER = "perfect_pixel_output"
 MAX_IMAGE_PIXELS = 32_000_000
-MAX_PREVIEW_PIXELS = 32_000_000
 SAMPLERS = {"center": sample_center, "median": sample_median, "majority": sample_majority}
 
 
@@ -24,7 +23,6 @@ SAMPLERS = {"center": sample_center, "median": sample_median, "majority": sample
 class Options:
     method: str = "center"
     grid: tuple[int, int] | None = None
-    preview_scale: int = 8
     output_dir: Path | None = None
     layout: str = "original"
     canvas: tuple[int, int] | None = None
@@ -40,8 +38,6 @@ class Options:
             type(n) is not int or not 1 <= n <= 1024 for n in self.grid
         )):
             raise ValueError("输出宽、高必须是 1～1024 的整数")
-        if self.preview_scale not in (0, 2, 4, 8, 16):
-            raise ValueError("预览倍率必须是 2、4、8、16，或关闭")
         if self.layout not in ("original", "crop", "keep", "fit", "canvas_fit", "stretch"):
             raise ValueError("未知主体 / 画布处理方式")
         if self.canvas is not None and (len(self.canvas) != 2 or any(
@@ -50,7 +46,7 @@ class Options:
             raise ValueError("画布宽、高必须是 1～1024 的整数")
         if self.layout in ("keep", "fit", "canvas_fit", "stretch") and self.canvas is None:
             raise ValueError("请指定画布宽、高")
-        if self.resample not in ("nearest", "area", "pixel", "k-centroid"):
+        if self.resample not in ("nearest", "pixel", "k-centroid"):
             raise ValueError("未知主体缩放方式")
         if type(self.palette_size) is not int or self.palette_size not in (0, 8, 16, 32, 64):
             raise ValueError("目标像素颜色数必须为保留颜色、8、16、32 或 64")
@@ -116,20 +112,9 @@ def layout_image(image, options, cancel=None):
         elif options.resample == "k-centroid":
             subject = k_centroid_pixels(subject, (tw, th), cancel=cancel)
         elif (tw, th) != (sw, sh):
-            if factor >= 1 or options.resample == "nearest":
-                # Select existing pixels, including alpha, without blending colors.
-                # Exact center mapping avoids the directional bias of legacy nearest.
-                subject = cv2.resize(subject, (tw, th), interpolation=cv2.INTER_NEAREST_EXACT)
-            else:
-                # Resize premultiplied colors to avoid dark fringes at transparent edges.
-                values = subject.astype(np.float32)
-                values[..., :3] *= values[..., 3:4] / 255
-                values = cv2.resize(values, (tw, th), interpolation=cv2.INTER_AREA)
-                alpha = values[..., 3:4] / 255
-                values[..., :3] = np.divide(values[..., :3], alpha,
-                    out=np.zeros_like(values[..., :3]), where=alpha > 0)
-                subject = np.clip(np.rint(values), 0, 255).astype(np.uint8)
-                subject[subject[..., 3] == 0, :3] = 0
+            # Select existing pixels, including alpha, without blending colors.
+            # Exact center mapping avoids the directional bias of legacy nearest.
+            subject = cv2.resize(subject, (tw, th), interpolation=cv2.INTER_NEAREST_EXACT)
     sh, sw = subject.shape[:2]
     canvas = np.zeros((ch, cw, 4), dtype=np.uint8)
     left, top = (cw - sw) // 2, (ch - sh) // 2
@@ -141,7 +126,6 @@ def layout_image(image, options, cancel=None):
 class Result:
     source: Path
     output: Path
-    preview: Path | None
     width: int
     height: int
     seconds: float
@@ -221,21 +205,21 @@ def _refine_grid_image(image, options, cancel=None):
     if options.grid:
         gw, gh = options.grid
         if gw > w or gh > h:
-            raise ValueError(f"输出 {gw}×{gh} 大于原图 {w}×{h}；预览放大请使用预览倍率")
+            raise ValueError(f"输出 {gw}×{gh} 大于原图 {w}×{h}")
         # Manual dimensions are exact, including all four image edges.
         xs = np.linspace(0, w, gw + 1).astype(np.int32)
         ys = np.linspace(0, h, gh + 1).astype(np.int32)
     else:
         if min(w, h) < 16:
-            raise GridDetectionError("图片过小，无法可靠识别网格；请指定输出尺寸")
+            raise GridDetectionError("图片过小，无法可靠识别网格；请选择原图直接转换")
         gw, gh = detect_grid_scale(detection)
         if gw is None or gh is None or gw < 1 or gh < 1:
-            raise GridDetectionError("自动识别网格失败；请切换到指定尺寸（如 16×16 或 32×32）")
+            raise GridDetectionError("自动识别网格失败；请选择原图直接转换，再设置目标画布尺寸")
         if gw > min(w, 1024) or gh > min(h, 1024):
-            raise GridDetectionError("识别网格过密；请指定输出尺寸（最大 1024×1024）")
+            raise GridDetectionError("识别网格过密；请选择原图直接转换，再设置目标画布尺寸")
         xs, ys = refine_grids(detection, gw, gh)
         if len(xs) < 2 or len(ys) < 2:
-            raise GridDetectionError("无法生成有效网格；请指定输出尺寸")
+            raise GridDetectionError("无法生成有效网格；请选择原图直接转换")
     check_cancel()
     cv2.setRNGSeed(42)
     if options.method == "center":
@@ -292,56 +276,37 @@ def _encode_png(image):
     return encoded.tobytes()
 
 
-def save_outputs(dest, stem, image, preview_scale):
-    """Reserve unique names, then atomically publish fully encoded PNGs."""
+def save_output(dest, stem, image):
+    """Reserve a unique name, then atomically publish one target-size PNG."""
     h, w = image.shape[:2]
-    if preview_scale and w * h * preview_scale ** 2 > MAX_PREVIEW_PIXELS:
-        raise ValueError("预览图超过 3200 万像素，请降低预览倍率或关闭预览导出")
-    blobs = [_encode_png(image)]
-    if preview_scale:
-        blobs.append(_encode_png(cv2.resize(image, (w * preview_scale, h * preview_scale),
-                                            interpolation=cv2.INTER_NEAREST)))
+    blob = _encode_png(image)
     dest.mkdir(parents=True, exist_ok=True)
     base = f"{stem}_perfect_{w}x{h}"
     number = 1
     while True:
         name = base if number == 1 else f"{base}_{number}"
-        paths = [dest / f"{name}.png"]
-        if preview_scale:
-            paths.append(dest / f"{name}_preview_{preview_scale}x.png")
-        reserved = []
+        path = dest / f"{name}.png"
         try:
-            for path in paths:
-                with path.open("xb"):
-                    pass
-                reserved.append(path)
+            with path.open("xb"):
+                pass
         except FileExistsError:
-            for path in reserved:
-                path.unlink(missing_ok=True)
             number += 1
             continue
-        except BaseException:
-            for path in reserved:
-                path.unlink(missing_ok=True)
-            raise
         break
-    temporary = []
+    temporary = None
     try:
-        for blob in blobs:
-            with tempfile.NamedTemporaryFile(dir=dest, prefix=".pixel-", suffix=".tmp",
-                                              delete=False) as f:
-                temporary.append(Path(f.name))
-                f.write(blob)
-        for temp, path in zip(temporary, paths):
-            os.replace(temp, path)
+        with tempfile.NamedTemporaryFile(dir=dest, prefix=".pixel-", suffix=".tmp",
+                                          delete=False) as f:
+            temporary = Path(f.name)
+            f.write(blob)
+        os.replace(temporary, path)
     except BaseException:
-        for path in reserved:
-            path.unlink(missing_ok=True)
+        path.unlink(missing_ok=True)
         raise
     finally:
-        for temp in temporary:
-            temp.unlink(missing_ok=True)
-    return paths[0], paths[1] if preview_scale else None
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return path
 
 
 def process_file(path, options):
@@ -351,6 +316,6 @@ def process_file(path, options):
     grid_image, info = prepare_image(image, options)
     out = layout_image(grid_image, options)
     dest = options.output_dir or path.parent / OUTPUT_FOLDER
-    output, preview = save_outputs(dest, path.stem, out, options.preview_scale)
+    output = save_output(dest, path.stem, out)
     h, w = out.shape[:2]
-    return Result(path, output, preview, w, h, time.perf_counter() - started, info)
+    return Result(path, output, w, h, time.perf_counter() - started, info)
