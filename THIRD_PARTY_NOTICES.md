@@ -118,3 +118,24 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
+
+# perfect-pixel JavaScript port
+
+frontend/src/pixel/grid.js ports the grid detection and refinement from perfect-pixel 0.1.4.
+https://github.com/theamusing/perfectPixel
+The installed upstream distribution declares MIT in its package metadata and
+credits theAmusing <amusingyyy@gmail.com>. It does not include a standalone
+LICENSE file, and the upstream repository currently has no LICENSE file.
+The attribution and declared license are preserved here; the MIT declaration
+can also be verified in the upstream pyproject.toml and release metadata.
+The JavaScript port uses native typed arrays and does not bundle OpenCV or NumPy.
+
+# Tauri JavaScript prototype
+
+The experimental desktop uses Tauri 2, its dialog plugin, Rust image codecs, and
+the Tauri JavaScript adapters. The exact Rust versions are pinned in
+frontend/src-tauri/Cargo.lock and JavaScript versions in frontend/package-lock.json.
+build_javascript.ps1 collects the packages' full license/notice files into
+dist/PerfectPixel-JS/RUST_NOTICES.txt for distribution alongside the executable.
+The prototype does not include code copied from Real-PixelArt; that project was
+used as an architecture and package-size reference.

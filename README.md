@@ -82,6 +82,9 @@ tests/                    算法、旧界面与桌面桥接测试
 
 ## Windows 打包
 
+JavaScript/Tauri 迁移原型的构建和验证见 [JAVASCRIPT_PROTOTYPE.md](JAVASCRIPT_PROTOTYPE.md)。
+下方保留 Python/pywebview 版的打包方法。
+
 提供 `build_windows.ps1` 作为源码打包入口。它先构建前端，再使用 PyInstaller 生成目录形式的应用，保留 WebView2 和 Python 的必要资源。需要先在 `.venv` 中安装 PyInstaller：
 
 ```powershell
