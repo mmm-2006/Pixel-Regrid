@@ -46,13 +46,41 @@ class DesktopTests(unittest.TestCase):
 
     def test_strict_parameters_and_inline_error(self):
         for invalid in (dict(width=""), dict(width=1.5), dict(width=True), dict(detail=3),
-                        dict(alpha_threshold=255), dict(layout="unknown"), dict(direct="false")):
+                        dict(alpha_threshold=255), dict(layout="unknown"), dict(layout="stretch"),
+                        dict(direct="false")):
             self.assertFalse(self.api.configure(self.options | invalid)["ok"])
         self.assertTrue(self.api.configure(self.options | dict(layout="keep", width=2048))["ok"])
         self.assertFalse(self.api.configure(self.options | dict(width=2048))["ok"])
 
+    def test_retired_stretch_settings_migrate_without_losing_parameters(self):
+        legacy = dict(mode="原图直接转换", layout="方块铺满 · 改尺寸",
+                      canvas_width=32, canvas_height=48, resample="k-centroid · 局部主色")
+        web = dict(web_options=self.options | dict(layout="stretch", width=32, height=48,
+                                                   resample="k-centroid"))
+        for settings in (legacy, web):
+            with self.subTest(settings=settings):
+                migrated = desktop.migrate_settings(settings)
+                self.assertEqual(migrated["layout"], "canvas_fit")
+                self.assertEqual((migrated["width"], migrated["height"]), (32, 48))
+                self.assertTrue(migrated["direct"])
+                self.assertEqual(migrated["resample"], "k-centroid")
+                self.assertTrue(self.api.configure(migrated)["ok"])
+                loaded = desktop.DesktopApi(self.root / "settings.json")
+                self.assertEqual(loaded.bootstrap()["options"], migrated)
+                preview = self.api.preview(self.key, migrated)
+                self.assertTrue(preview["ok"])
+                self.assertIsNone(preview["error"])
+                blob = base64.b64decode(preview["output"]["src"].split(",", 1)[1])
+                image = cv2.imdecode(np.frombuffer(blob, np.uint8), cv2.IMREAD_UNCHANGED)
+                self.assertEqual(image.shape[:2], (48, 32))
+                # Square input keeps its aspect ratio, leaving transparent top/bottom margins.
+                self.assertFalse(image[:8, :, 3].any())
+                self.assertFalse(image[-8:, :, 3].any())
+        self.assertEqual(legacy["layout"], "方块铺满 · 改尺寸")
+        self.assertEqual(web["web_options"]["layout"], "stretch")
+
     def test_preview_retains_alpha_and_exactly_matches_export(self):
-        for layout in ("original", "keep", "fit", "canvas_fit", "stretch"):
+        for layout in ("original", "keep", "fit", "canvas_fit"):
             for method in ("nearest", "pixel", "k-centroid"):
                 with self.subTest(layout=layout, resample=method):
                     data = self.options | dict(layout=layout, width=24, height=24, resample=method)

@@ -44,6 +44,8 @@ def parse_options(payload, output_dir=None):
     data = DEFAULTS | {k: v for k, v in payload.items() if k in DEFAULTS}
     if type(data["direct"]) is not bool:
         raise ValueError("输入方式有误")
+    if data["layout"] not in LAYOUTS.values():
+        raise ValueError("输出方式有误")
     for field in ("width", "height", "palette_size", "detail", "alpha_threshold"):
         if type(data[field]) is not int:
             raise ValueError("尺寸、颜色数和透明阈值必须是整数")
@@ -63,6 +65,8 @@ def parse_options(payload, output_dir=None):
 def migrate_settings(settings):
     data = dict(DEFAULTS)
     legacy = dict(settings)
+    if legacy.get("layout") == "方块铺满 · 改尺寸":
+        legacy["layout"] = "整图等比例缩放 · 保留原留白"
     if legacy.get("mode") == "指定尺寸":
         legacy["mode"] = "自动识别"
         if legacy.get("layout", "保持原画布") in ("保持原画布", "只裁透明边 · 最小画布"):
@@ -81,8 +85,11 @@ def migrate_settings(settings):
         if type(value) is int and minimum <= value <= maximum:
             data[field] = value
     if isinstance(settings.get("web_options"), dict):
+        web_options = dict(settings["web_options"])
+        if web_options.get("layout") == "stretch":
+            web_options["layout"] = "canvas_fit"
         try:
-            _, data = parse_options(settings["web_options"])
+            _, data = parse_options(web_options)
         except (ValueError, TypeError):
             pass
     return data

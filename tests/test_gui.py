@@ -454,10 +454,10 @@ class GuiIntegrationTests(unittest.TestCase):
             migrated.destroy()
             migrated.preview_pool.shutdown(wait=True, cancel_futures=True)
 
-    def test_target_pixel_controls_and_block_direct_conversion(self):
+    def test_target_pixel_controls_and_full_canvas_direct_conversion(self):
         path = self.image("方块.png")
         self.app.append_files([path])
-        self.app.layout.set("方块铺满 · 改尺寸")
+        self.app.layout.set("整图等比例缩放 · 保留原留白")
         self.app.set_canvas_size(8)
         self.app.palette.set("8 色")
         self.app.detail.set("较强")
@@ -465,7 +465,7 @@ class GuiIntegrationTests(unittest.TestCase):
         self.pump_until(lambda: "8 × 8" in self.app.output_caption.cget("text"))
         options = self.app.get_options()
         self.assertEqual((options.layout, options.direct, options.palette_size, options.detail),
-                         ("stretch", True, 8, 2))
+                         ("canvas_fit", True, 8, 2))
         self.assertEqual(str(self.app.palette_input.cget("state")), "readonly")
         self.assertIn("原图 16×16", self.app.subject_caption.cget("text"))
         self.app.start()

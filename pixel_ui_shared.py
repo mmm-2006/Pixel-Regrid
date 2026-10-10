@@ -4,8 +4,7 @@ from pixel_core import SCALE_CHANGE_THRESHOLD, scaling_info
 METHODS = {"中心取样 · 快速": "center", "中位数 · 去噪": "median", "多数色 · 较慢": "majority"}
 LAYOUTS = {"保持原画布": "original",
            "主体不缩放 · 改画布": "keep", "主体等比例缩放 · 改画布": "fit",
-           "整图等比例缩放 · 保留原留白": "canvas_fit",
-           "方块铺满 · 改尺寸": "stretch"}
+           "整图等比例缩放 · 保留原留白": "canvas_fit"}
 RESAMPLERS = {"目标像素 · 结构保护": "pixel", "像素硬边 · 最近邻": "nearest",
               "k-centroid · 局部主色": "k-centroid"}
 PALETTES = {"保留颜色": 0, "8 色": 8, "16 色": 16, "32 色": 32, "64 色": 64}
@@ -15,7 +14,6 @@ LAYOUT_HELP = {
     "keep": "主体像素保持原样，居中放入目标画布；画布不能小于主体。",
     "fit": "先裁透明留白，再等比例缩放主体；适合物品图标。",
     "canvas_fit": "主体和原有留白一起等比例缩放；比例不同时补透明边。",
-    "stretch": "整张图铺满目标宽高；适合方块贴图，宽高比例不同时会拉伸。",
 }
 RESAMPLE_HELP = {
     "pixel": "优先保护细线与小色块；减少颜色数可能丢失高光，较强保护也可能保留噪点。",

@@ -122,6 +122,8 @@ class App(tk.Tk):
                 for axis in ("width", "height"):
                     value = self.settings.get(axis, 32)
                     self.settings["canvas_" + axis] = value if type(value) is int and 1 <= value <= 1024 else 32
+        if self.settings.get("layout") == "方块铺满 · 改尺寸":
+            self.settings["layout"] = "整图等比例缩放 · 保留原留白"
         if self.settings.get("layout") == "只裁透明边 · 最小画布":
             # Its former per-image canvas has no saved fixed dimensions. Keep
             # the input intact until the user chooses "裁到主体大小".
@@ -373,21 +375,21 @@ class App(tk.Tk):
         layout, resample = LAYOUTS[self.layout.get()], RESAMPLERS[self.resample.get()]
         self.layout_help.configure(text=LAYOUT_HELP[layout])
         self.algorithm_help.configure(text=RESAMPLE_HELP[resample])
-        canvas_state = "normal" if not self.busy and LAYOUTS[self.layout.get()] in ("keep", "fit", "canvas_fit", "stretch") else "disabled"
+        canvas_state = "normal" if not self.busy and LAYOUTS[self.layout.get()] in ("keep", "fit", "canvas_fit") else "disabled"
         self.canvas_width_input.configure(state=canvas_state, to=canvas_limit(layout))
         self.canvas_height_input.configure(state=canvas_state, to=canvas_limit(layout))
         self.alpha_threshold_input.configure(state="disabled" if self.busy else "normal")
-        converting = not self.busy and LAYOUTS[self.layout.get()] in ("fit", "canvas_fit", "stretch")
+        converting = not self.busy and LAYOUTS[self.layout.get()] in ("fit", "canvas_fit")
         self.resample_input.configure(state="readonly" if converting else "disabled")
         pixel_state = "readonly" if converting and RESAMPLERS[self.resample.get()] == "pixel" else "disabled"
         self.palette_input.configure(state=pixel_state)
         self.detail_input.configure(state=pixel_state)
-        if layout in ("fit", "canvas_fit", "stretch"):
+        if layout in ("fit", "canvas_fit"):
             if not self.algorithm_step.winfo_manager():
                 self.algorithm_step.pack(fill="x", pady=(6, 0), before=self.export_step)
         else:
             self.algorithm_step.pack_forget()
-        if layout in ("fit", "canvas_fit", "stretch") and resample == "pixel":
+        if layout in ("fit", "canvas_fit") and resample == "pixel":
             if not self.pixel_row.winfo_manager():
                 self.pixel_row.pack(fill="x", pady=(8, 0))
         else:
@@ -405,7 +407,7 @@ class App(tk.Tk):
     def use_grid_canvas(self):
         info = self.current_info
         if not self.busy and info:
-            if LAYOUTS[self.layout.get()] not in ("keep", "fit", "canvas_fit", "stretch"):
+            if LAYOUTS[self.layout.get()] not in ("keep", "fit", "canvas_fit"):
                 self.layout.set("主体不缩放 · 改画布")
             self.canvas_width.set(str(info.grid[0]))
             self.canvas_height.set(str(info.grid[1]))
@@ -532,7 +534,7 @@ class App(tk.Tk):
         except ValueError:
             raise ValueError("透明噪点阈值必须是 0～254 的整数；0 表示关闭") from None
         canvas = None
-        if layout in ("keep", "fit", "canvas_fit", "stretch"):
+        if layout in ("keep", "fit", "canvas_fit"):
             try:
                 canvas = int(self.canvas_width.get()), int(self.canvas_height.get())
             except ValueError:

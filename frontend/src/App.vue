@@ -19,11 +19,11 @@ const camera = ref({ actual: false, factor: 1, x: 0, y: 0 }), outputScale = ref(
 const options = reactive({ direct: false, method: 'center', layout: 'original', width: 32,
   height: 32, resample: 'pixel', palette_size: 32, detail: 1, alpha_threshold: 1 })
 const activeFile = computed(() => files.value.find(file => file.key === activeKey.value))
-const resize = computed(() => ['fit', 'canvas_fit', 'stretch'].includes(options.layout))
+const resize = computed(() => ['fit', 'canvas_fit'].includes(options.layout))
 const successCount = computed(() => files.value.filter(file => file.status === 'success').length)
 const layoutHelp = computed(() => ({ original: '保留识别后的完整尺寸，不缩放、不裁边。',
   keep: '裁透明边，主体不缩放；画布不能小于主体。', fit: '裁透明留白后等比例缩放，适合物品图标。',
-  canvas_fit: '连同原有留白等比例缩放，不足部分补透明边。', stretch: '整图铺满目标尺寸，比例不同时会拉伸。' })[options.layout])
+  canvas_fit: '连同原有留白等比例缩放，不足部分补透明边。' })[options.layout])
 const algorithmHelp = computed(() => ({ pixel: '优先保留细线和小色块；较强保护也可能保留噪点。',
   nearest: '保留原有颜色和硬边；缩小时可能丢失细线。', 'k-centroid': '以局部主色形成清晰色块；少量高光可能被舍弃。' })[options.resample])
 let pollTimer, previewTimer, generation = 0, disposed = false, pollFailures = 0
@@ -103,7 +103,7 @@ function preset(kind) {
   const presets = {
     restore: { direct: false, layout: 'original' },
     item: { layout: 'fit', width: 32, height: 32, resample: 'pixel', palette_size: 0, detail: 1 },
-    block: { layout: 'stretch', width: 16, height: 16, resample: 'k-centroid' },
+    block: { layout: 'canvas_fit', width: 16, height: 16, resample: 'k-centroid' },
   }
   Object.assign(options, presets[kind])
 }
@@ -196,7 +196,7 @@ onBeforeUnmount(() => {
         <fieldset class="settings-scroll" :disabled="busy || !connected">
           <section class="setting-section"><div class="section-heading">预设</div><div class="preset-actions"><button @click="preset('restore')">网格还原</button><button @click="preset('item')">物品图标</button><button @click="preset('block')">方块贴图</button></div></section>
           <section class="setting-section"><div class="section-heading">输入方式</div><div class="segmented full"><button :class="{ active: !options.direct }" @click="options.direct = false">自动识别网格</button><button :class="{ active: options.direct }" @click="options.direct = true">原图直接转换</button></div><p class="help-text">{{ options.direct ? '跳过网格识别，直接调整原图。' : '识别像素色块，将放大的图片还原成真实像素。' }}</p></section>
-          <section class="setting-section"><div class="section-heading">画布与尺寸</div><label class="field-label" for="layout">输出方式</label><select id="layout" v-model="options.layout"><option value="original">保持原画布</option><option value="fit">主体等比例缩放</option><option value="canvas_fit">整图等比例缩放</option><option value="stretch">方块铺满</option><option value="keep">主体不缩放 · 改画布</option></select><p class="help-text">{{ layoutHelp }}</p>
+          <section class="setting-section"><div class="section-heading">画布与尺寸</div><label class="field-label" for="layout">输出方式</label><select id="layout" v-model="options.layout"><option value="original">保持原画布</option><option value="fit">主体等比例缩放</option><option value="canvas_fit">整图等比例缩放</option><option value="keep">主体不缩放 · 改画布</option></select><p class="help-text">{{ layoutHelp }}</p>
             <label class="field-label">目标尺寸 <span v-if="options.layout === 'original'">选预设启用缩放</span></label><div class="dimension-inputs"><label><input v-model.number="options.width" type="number" min="1" :max="options.layout === 'keep' ? 8192 : 1024" aria-label="画布宽度" :disabled="options.layout === 'original'"/><span>宽</span></label><span>×</span><label><input v-model.number="options.height" type="number" min="1" :max="options.layout === 'keep' ? 8192 : 1024" aria-label="画布高度" :disabled="options.layout === 'original'"/><span>高</span></label><small>px</small></div><div class="size-presets"><button v-for="size in [16, 32, 64, 128]" :key="size" :class="{ chosen: options.layout !== 'original' && options.width === size && options.height === size }" @click="setSize(size)">{{ size }} × {{ size }}</button></div><div class="dimension-actions"><button :disabled="!preview?.info?.grid || pending" @click="useDimensions(false)">用输入尺寸</button><button :disabled="!preview?.info?.subject || pending" @click="useDimensions(true)">裁到主体大小</button></div>
           </section>
           <section v-if="resize" class="setting-section"><div class="section-heading">缩放算法</div><select v-model="options.resample" aria-label="缩放算法"><option value="pixel">目标像素 · 结构保护</option><option value="nearest">像素硬边 · 最近邻</option><option value="k-centroid">k-centroid · 局部主色</option></select><p class="help-text">{{ algorithmHelp }}</p><div v-if="options.resample === 'pixel'" class="paired-fields"><label>目标颜色<select v-model.number="options.palette_size"><option :value="0">保留颜色</option><option v-for="n in [8, 16, 32, 64]" :key="n" :value="n">{{ n }} 色</option></select></label><label>细节保护<select v-model.number="options.detail"><option :value="0">关闭</option><option :value="1">适中</option><option :value="2">较强</option></select></label></div></section>
@@ -211,6 +211,6 @@ onBeforeUnmount(() => {
     <div class="status-bar"><span class="status-copy">{{ status }}</span><button @click="showLog = true">处理记录</button></div>
     <div v-if="busy && progress.total" class="batch-progress"><span :style="{ width: `${progress.done / progress.total * 100}%` }"/></div>
 
-    <div v-if="showLog || showHelp" class="modal-backdrop" @click.self="showLog = showHelp = false"><section class="modal" role="dialog" aria-modal="true" :aria-label="showLog ? '处理记录' : '操作帮助'"><div class="modal-heading"><h2>{{ showLog ? '处理记录' : '操作帮助' }}</h2><button class="icon-button" aria-label="关闭弹窗" @click="showLog = showHelp = false"><X :size="20"/></button></div><template v-if="showLog"><p v-if="!details.length" class="help-text">导出后在这里查看结果路径和失败原因。</p><pre v-for="(detail, index) in details" :key="index">{{ detail }}</pre></template><template v-else><p>添加图片 → 选择用途或调整参数 → 检查预览 → 导出。</p><p class="help-text">自动识别适合具有一致色块网格的像素风图片。识别失败时，可切换“原图直接转换”。“物品图标”会裁透明边再等比例缩放，“方块贴图”会铺满画布。</p><div class="shortcut-list"><span>添加图片<kbd>Ctrl O</kbd></span><span>全选图片<kbd>Ctrl A</kbd></span><span>移除选中<kbd>Delete</kbd></span><span>适应窗口<kbd>F</kbd></span><span>实际像素<kbd>1</kbd></span></div><p class="help-text">Ctrl 点击多选，Shift 点击选择连续图片。滚轮缩放，拖动平移；网格在像素足够大时显示。并排预览同步操作，两张图分别以适应窗口为基准缩放。</p><p class="help-text">批量导出时，修改参数会暂时禁用。取消或退出会等待当前图片完成，已经保存的结果会保留。</p></template></section></div>
+    <div v-if="showLog || showHelp" class="modal-backdrop" @click.self="showLog = showHelp = false"><section class="modal" role="dialog" aria-modal="true" :aria-label="showLog ? '处理记录' : '操作帮助'"><div class="modal-heading"><h2>{{ showLog ? '处理记录' : '操作帮助' }}</h2><button class="icon-button" aria-label="关闭弹窗" @click="showLog = showHelp = false"><X :size="20"/></button></div><template v-if="showLog"><p v-if="!details.length" class="help-text">导出后在这里查看结果路径和失败原因。</p><pre v-for="(detail, index) in details" :key="index">{{ detail }}</pre></template><template v-else><p>添加图片 → 选择用途或调整参数 → 检查预览 → 导出。</p><p class="help-text">自动识别适合具有一致色块网格的像素风图片。识别失败时，可切换“原图直接转换”。“物品图标”会裁透明边再等比例缩放，“方块贴图”会将整图等比例缩放到 16×16 画布，比例不同时补透明边。</p><div class="shortcut-list"><span>添加图片<kbd>Ctrl O</kbd></span><span>全选图片<kbd>Ctrl A</kbd></span><span>移除选中<kbd>Delete</kbd></span><span>适应窗口<kbd>F</kbd></span><span>实际像素<kbd>1</kbd></span></div><p class="help-text">Ctrl 点击多选，Shift 点击选择连续图片。滚轮缩放，拖动平移；网格在像素足够大时显示。并排预览同步操作，两张图分别以适应窗口为基准缩放。</p><p class="help-text">批量导出时，修改参数会暂时禁用。取消或退出会等待当前图片完成，已经保存的结果会保留。</p></template></section></div>
   </div>
 </template>
