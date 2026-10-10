@@ -8,6 +8,7 @@ import time
 import cv2
 import numpy as np
 from pixel_retarget import target_pixels
+from pixel_k_centroid import k_centroid_pixels
 from perfect_pixel.perfect_pixel import (
     detect_grid_scale, refine_grids, sample_center, sample_majority, sample_median,
 )
@@ -49,7 +50,7 @@ class Options:
             raise ValueError("画布宽、高必须是 1～1024 的整数")
         if self.layout in ("keep", "fit", "canvas_fit", "stretch") and self.canvas is None:
             raise ValueError("请指定画布宽、高")
-        if self.resample not in ("nearest", "area", "pixel"):
+        if self.resample not in ("nearest", "area", "pixel", "k-centroid"):
             raise ValueError("未知主体缩放方式")
         if type(self.palette_size) is not int or self.palette_size not in (0, 8, 16, 32, 64):
             raise ValueError("目标像素颜色数必须为保留颜色、8、16、32 或 64")
@@ -112,6 +113,8 @@ def layout_image(image, options, cancel=None):
         if options.resample == "pixel":
             subject = target_pixels(subject, (tw, th), options.palette_size, options.detail,
                                     cancel=cancel, wrap=options.layout == "stretch")
+        elif options.resample == "k-centroid":
+            subject = k_centroid_pixels(subject, (tw, th), cancel=cancel)
         elif (tw, th) != (sw, sh):
             if factor >= 1 or options.resample == "nearest":
                 # Select existing pixels, including alpha, without blending colors.
@@ -271,7 +274,7 @@ def prepare_image(image, options, cancel=None):
         try:
             out = _refine_grid_image(image, options, cancel)
         except GridDetectionError:
-            if options.resample != "pixel" or options.layout not in ("fit", "canvas_fit", "stretch") or options.grid:
+            if options.resample not in ("pixel", "k-centroid") or options.layout not in ("fit", "canvas_fit", "stretch") or options.grid:
                 raise
             out, recovery = image, "fallback"
     return out, image_info(out, recovery)

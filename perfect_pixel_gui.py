@@ -33,7 +33,7 @@ LAYOUTS = {"保持原画布": "original", "只裁透明边 · 最小画布": "cr
            "整图等比例缩放 · 保留原留白": "canvas_fit",
            "方块铺满 · 改尺寸": "stretch"}
 RESAMPLERS = {"目标像素 · 结构保护": "pixel", "像素硬边 · 最近邻": "nearest",
-              "平滑缩小 · 面积平均": "area"}
+              "平滑缩小 · 面积平均": "area", "k-centroid · 局部主色": "k-centroid"}
 PALETTES = {"保留颜色": 0, "8 色": 8, "16 色": 16, "32 色": 32, "64 色": 64}
 DETAILS = {"关闭": 0, "适中": 1, "较强": 2}
 
@@ -106,7 +106,7 @@ class PreviewRenderer:
         if cancelled.is_set():
             return None
         key = (options.method, options.grid, options.direct,
-               options.resample == "pixel" and options.layout in ("fit", "canvas_fit", "stretch"))
+               options.resample in ("pixel", "k-centroid") and options.layout in ("fit", "canvas_fit", "stretch"))
         info = None
         try:
             if key not in self.outputs:

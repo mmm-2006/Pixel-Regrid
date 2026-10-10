@@ -68,8 +68,9 @@ class TargetPixelTests(unittest.TestCase):
     def test_direct_and_auto_fallback_are_explicit_and_other_errors_are_not_hidden(self):
         image = np.full((32, 32, 3), [40, 80, 120], np.uint8)
         with patch.object(core, "detect_grid_scale", return_value=(None, None)):
-            for layout in ("fit", "canvas_fit"):
-                options = core.Options(layout=layout, canvas=(16, 16), resample="pixel")
+            for layout, resample in ((layout, resample) for layout in ("fit", "canvas_fit", "stretch")
+                                     for resample in ("pixel", "k-centroid")):
+                options = core.Options(layout=layout, canvas=(16, 16), resample=resample)
                 prepared, info = core.prepare_image(image, options)
                 self.assertIs(prepared, image)
                 self.assertEqual(info.recovery, "fallback")

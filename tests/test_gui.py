@@ -173,6 +173,31 @@ class GuiIntegrationTests(unittest.TestCase):
         self.assertIsNone(self.app.preview_after_id)
         self.assertEqual(self.app.output_view.cget("text"), "选择图片后自动预览")
 
+    def test_k_centroid_selection_settings_preview_and_export(self):
+        path = self.image("k-centroid.png")
+        self.app.append_files([path])
+        self.app.mode.set("原图直接转换")
+        self.app.layout.set("主体等比例缩放 · 改画布")
+        self.app.set_canvas_size(8)
+        label = "k-centroid · 局部主色"
+        self.app.resample.set(label)
+        self.pump_until(lambda: "8 × 8" in self.app.output_caption.cget("text"))
+        self.assertEqual(self.app.get_options().resample, "k-centroid")
+        self.assertEqual(str(self.app.resample_input.cget("state")), "readonly")
+        self.assertEqual(str(self.app.palette_input.cget("state")), "disabled")
+        self.assertEqual(str(self.app.detail_input.cget("state")), "disabled")
+        self.app.save_settings()
+        self.assertEqual(gui.load_settings()["resample"], label)
+        live = gui.image_thumbnail(gui.layout_image(gui.read_image(path), self.app.get_options()))
+        self.app.start()
+        self.pump_until(lambda: not self.app.busy)
+        result = self.app.results[path_key(path)]
+        self.assertEqual((result.width, result.height), (8, 8))
+        self.assertEqual(gui.thumbnail(result.output), live)
+        self.app.resample.set("目标像素 · 结构保护")
+        self.app.update_grid_state()
+        self.assertEqual(str(self.app.palette_input.cget("state")), "readonly")
+
     def test_subject_canvas_controls_minimum_and_inline_error_recovery(self):
         path = self.root / "主体.png"
         image = np.zeros((16, 16, 4), np.uint8)
@@ -307,7 +332,10 @@ class PreviewRendererTests(unittest.TestCase):
                                        ("canvas_fit", (12, 8), "nearest"),
                                        ("canvas_fit", (8, 12), "area"),
                                        ("canvas_fit", (12, 8), "pixel"),
-                                       ("stretch", (8, 8), "pixel")):
+                                       ("stretch", (8, 8), "pixel"),
+                                       ("fit", (8, 8), "k-centroid"),
+                                       ("canvas_fit", (12, 8), "k-centroid"),
+                                       ("stretch", (8, 12), "k-centroid")):
                     options = gui.Options(grid=(16, 16), layout=layout, canvas=canvas,
                                           resample=resample, preview_scale=0)
                     _, preview, info = renderer.render(path, options, 80, 80, threading.Event())
