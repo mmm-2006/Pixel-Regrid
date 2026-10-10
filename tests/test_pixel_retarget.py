@@ -67,15 +67,16 @@ class TargetPixelTests(unittest.TestCase):
 
     def test_direct_and_auto_fallback_are_explicit_and_other_errors_are_not_hidden(self):
         image = np.full((32, 32, 3), [40, 80, 120], np.uint8)
-        options = core.Options(layout="fit", canvas=(16, 16), resample="pixel")
         with patch.object(core, "detect_grid_scale", return_value=(None, None)):
-            prepared, info = core.prepare_image(image, options)
-            self.assertIs(prepared, image)
-            self.assertEqual(info.recovery, "fallback")
-            out = core.refine_image(image, options)
-            self.assertEqual(out.shape, (16, 16, 4))
-            with self.assertRaises(core.GridDetectionError):
-                core.refine_image(image, core.Options(layout="fit", canvas=(16, 16)))
+            for layout in ("fit", "canvas_fit"):
+                options = core.Options(layout=layout, canvas=(16, 16), resample="pixel")
+                prepared, info = core.prepare_image(image, options)
+                self.assertIs(prepared, image)
+                self.assertEqual(info.recovery, "fallback")
+                out = core.refine_image(image, options)
+                self.assertEqual(out.shape, (16, 16, 4))
+                with self.assertRaises(core.GridDetectionError):
+                    core.refine_image(image, core.Options(layout=layout, canvas=(16, 16)))
         with patch.object(core, "detect_grid_scale") as detect:
             _, info = core.prepare_image(image, core.Options(direct=True))
             self.assertEqual(info.recovery, "direct")

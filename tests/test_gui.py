@@ -209,6 +209,44 @@ class GuiIntegrationTests(unittest.TestCase):
         self.assertEqual((result.width, result.height), (8, 8))
         self.assertEqual(result.info.subject, (6, 10))
 
+    def test_full_canvas_fit_controls_preview_export_and_saved_setting(self):
+        path = self.root / "整图.png"
+        image = np.zeros((12, 8, 4), np.uint8)
+        image[2:6, 2:4] = [10, 40, 200, 255]
+        cv2.imencode(".png", image)[1].tofile(path)
+        original = path.read_bytes()
+        self.app.append_files([path])
+        self.app.mode.set("原图直接转换")
+        label = "整图等比例缩放 · 保留原留白"
+        self.app.layout.set(label)
+        self.app.canvas_width.set("10")
+        self.app.canvas_height.set("6")
+        self.pump_until(lambda: "10 × 6" in self.app.output_caption.cget("text"))
+        options = self.app.get_options()
+        self.assertEqual((options.layout, options.canvas, options.resample),
+                         ("canvas_fit", (10, 6), "pixel"))
+        for widget in (self.app.canvas_width_input, self.app.canvas_height_input):
+            self.assertEqual(str(widget.cget("state")), "normal")
+        for widget in (self.app.resample_input, self.app.palette_input, self.app.detail_input):
+            self.assertEqual(str(widget.cget("state")), "readonly")
+        self.app.use_grid_canvas()
+        self.assertEqual(self.app.layout.get(), label)
+        self.assertEqual(self.app.get_options().canvas, (8, 12))
+        self.app.canvas_width.set("10")
+        self.app.canvas_height.set("6")
+        self.app.resample.set("像素硬边 · 最近邻")
+        self.app.save_settings()
+        self.assertEqual(gui.load_settings()["layout"], label)
+        self.app.start()
+        self.pump_until(lambda: not self.app.busy)
+        result = self.app.results[path_key(path)]
+        output = gui.read_image(result.output)
+        self.assertEqual(output.shape, (6, 10, 4))
+        expected = np.zeros((6, 10, 4), np.uint8)
+        expected[1:3, 4:5] = [10, 40, 200, 255]
+        np.testing.assert_array_equal(output, expected)
+        self.assertEqual(path.read_bytes(), original)
+
     def test_target_pixel_controls_and_block_direct_conversion(self):
         path = self.image("方块.png")
         self.app.append_files([path])
@@ -266,6 +304,9 @@ class PreviewRendererTests(unittest.TestCase):
                 for layout, canvas, resample in (("original", None, "nearest"), ("crop", None, "nearest"),
                                        ("keep", (12, 14), "nearest"), ("fit", (8, 8), "nearest"),
                                        ("fit", (8, 8), "area"), ("fit", (8, 8), "pixel"),
+                                       ("canvas_fit", (12, 8), "nearest"),
+                                       ("canvas_fit", (8, 12), "area"),
+                                       ("canvas_fit", (12, 8), "pixel"),
                                        ("stretch", (8, 8), "pixel")):
                     options = gui.Options(grid=(16, 16), layout=layout, canvas=canvas,
                                           resample=resample, preview_scale=0)

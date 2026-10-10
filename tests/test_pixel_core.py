@@ -225,6 +225,41 @@ class PixelCoreTests(unittest.TestCase):
         smooth = core.layout_image(image, core.Options(layout="fit", canvas=(32, 32), resample="area"))
         self.assertTrue(any(tuple(v) not in original_values for v in smooth.reshape(-1, 4)))
 
+    def test_canvas_fit_preserves_original_margins_and_off_center_position(self):
+        portrait = np.zeros((12, 8, 4), np.uint8)
+        portrait[2:6, 2:4] = [10, 40, 200, 255]
+        landscape = portrait.transpose(1, 0, 2).copy()
+        square = np.zeros((8, 8, 4), np.uint8)
+        square[2:4, 2:4] = [10, 40, 200, 255]
+        cases = ((portrait, (10, 6), (4, 1, 5, 3)),
+                 (landscape, (6, 10), (1, 4, 3, 5)),
+                 (portrait, (16, 24), (4, 4, 8, 12)),
+                 (square, (4, 4), (1, 1, 2, 2)))
+        for image, canvas, bounds in cases:
+            with self.subTest(canvas=canvas, source=image.shape):
+                for resample in ("nearest", "area", "pixel"):
+                    out = core.layout_image(image, core.Options(
+                        layout="canvas_fit", canvas=canvas, resample=resample,
+                        palette_size=0, detail=0))
+                    expected = np.zeros((canvas[1], canvas[0], 4), np.uint8)
+                    x0, y0, x1, y1 = bounds
+                    expected[y0:y1, x0:x1] = [10, 40, 200, 255]
+                    np.testing.assert_array_equal(out, expected)
+
+    def test_canvas_fit_handles_opaque_and_fully_transparent_canvases(self):
+        opaque = np.full((60, 40, 3), [30, 50, 80], np.uint8)
+        out = core.layout_image(opaque, core.Options(layout="canvas_fit", canvas=(32, 32)))
+        self.assertEqual(out.shape, (32, 32, 4))
+        self.assertEqual(core.subject_bounds(out), (5, 0, 26, 32))
+        self.assertTrue(np.all(out[:, 5:26, 3] == 255))
+        self.assertTrue(np.all(out[:, :5] == 0))
+        self.assertTrue(np.all(out[:, 26:] == 0))
+        empty = np.zeros((12, 8, 4), np.uint8)
+        for resample in ("nearest", "area", "pixel"):
+            out = core.layout_image(empty, core.Options(
+                layout="canvas_fit", canvas=(10, 6), resample=resample))
+            np.testing.assert_array_equal(out, np.zeros((6, 10, 4), np.uint8))
+
     def test_empty_and_opaque_subjects_have_explicit_behavior(self):
         empty = np.zeros((4, 4, 4), np.uint8)
         self.assertIsNone(core.image_info(empty).subject)
@@ -240,7 +275,8 @@ class PixelCoreTests(unittest.TestCase):
         self.assertTrue(np.all(padded[0] == 0))
 
     def test_canvas_validation_and_export_metadata(self):
-        for options in (core.Options(layout="unknown"), core.Options(layout="keep"), core.Options(resample="bad"),
+        for options in (core.Options(layout="unknown"), core.Options(layout="keep"),
+                        core.Options(layout="canvas_fit"), core.Options(resample="bad"),
                         core.Options(canvas=(0, 2)), core.Options(canvas=(3, 1025)),
                         core.Options(canvas=(True, 2)), core.Options(canvas=(2.5, 2))):
             with self.assertRaises(ValueError):

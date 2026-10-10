@@ -41,13 +41,13 @@ class Options:
             raise ValueError("输出宽、高必须是 1～1024 的整数")
         if self.preview_scale not in (0, 2, 4, 8, 16):
             raise ValueError("预览倍率必须是 2、4、8、16，或关闭")
-        if self.layout not in ("original", "crop", "keep", "fit", "stretch"):
+        if self.layout not in ("original", "crop", "keep", "fit", "canvas_fit", "stretch"):
             raise ValueError("未知主体 / 画布处理方式")
         if self.canvas is not None and (len(self.canvas) != 2 or any(
             type(n) is not int or not 1 <= n <= 1024 for n in self.canvas
         )):
             raise ValueError("画布宽、高必须是 1～1024 的整数")
-        if self.layout in ("keep", "fit", "stretch") and self.canvas is None:
+        if self.layout in ("keep", "fit", "canvas_fit", "stretch") and self.canvas is None:
             raise ValueError("请指定画布宽、高")
         if self.resample not in ("nearest", "area", "pixel"):
             raise ValueError("未知主体缩放方式")
@@ -86,11 +86,12 @@ def image_info(image, recovery="grid"):
 
 
 def layout_image(image, options, cancel=None):
-    """Crop transparent margins, then change the canvas without changing the source grid."""
+    """Lay out the subject or full image on a target canvas after grid recovery."""
     options.validate()
     if options.layout == "original":
         return image
-    bounds = (0, 0, image.shape[1], image.shape[0]) if options.layout == "stretch" else subject_bounds(image)
+    bounds = ((0, 0, image.shape[1], image.shape[0])
+              if options.layout in ("canvas_fit", "stretch") else subject_bounds(image))
     if bounds is None:
         raise ValueError("图片完全透明，没有可识别的主体")
     x0, y0, x1, y1 = bounds
@@ -104,7 +105,7 @@ def layout_image(image, options, cancel=None):
                          "请增大画布或选择主体等比例缩放")
     if subject.shape[2] == 3:
         subject = cv2.cvtColor(subject, cv2.COLOR_BGR2BGRA)
-    if options.layout in ("fit", "stretch"):
+    if options.layout in ("fit", "canvas_fit", "stretch"):
         factor = min(cw / sw, ch / sh)
         tw, th = ((cw, ch) if options.layout == "stretch" else
                   (min(cw, max(1, round(sw * factor))), min(ch, max(1, round(sh * factor)))))
@@ -270,7 +271,7 @@ def prepare_image(image, options, cancel=None):
         try:
             out = _refine_grid_image(image, options, cancel)
         except GridDetectionError:
-            if options.resample != "pixel" or options.layout not in ("fit", "stretch") or options.grid:
+            if options.resample != "pixel" or options.layout not in ("fit", "canvas_fit", "stretch") or options.grid:
                 raise
             out, recovery = image, "fallback"
     return out, image_info(out, recovery)

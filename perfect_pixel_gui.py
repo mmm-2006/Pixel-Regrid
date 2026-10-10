@@ -30,6 +30,7 @@ METHODS = {"中心取样 · 快速": "center", "中位数 · 去噪": "median", 
 SCALES = {"不导出": 0, "2 倍": 2, "4 倍": 4, "8 倍": 8, "16 倍": 16}
 LAYOUTS = {"保持原画布": "original", "只裁透明边 · 最小画布": "crop",
            "主体不缩放 · 改画布": "keep", "主体等比例缩放 · 改画布": "fit",
+           "整图等比例缩放 · 保留原留白": "canvas_fit",
            "方块铺满 · 改尺寸": "stretch"}
 RESAMPLERS = {"目标像素 · 结构保护": "pixel", "像素硬边 · 最近邻": "nearest",
               "平滑缩小 · 面积平均": "area"}
@@ -105,7 +106,7 @@ class PreviewRenderer:
         if cancelled.is_set():
             return None
         key = (options.method, options.grid, options.direct,
-               options.resample == "pixel" and options.layout in ("fit", "stretch"))
+               options.resample == "pixel" and options.layout in ("fit", "canvas_fit", "stretch"))
         info = None
         try:
             if key not in self.outputs:
@@ -360,10 +361,10 @@ class App(tk.Tk):
         state = "normal" if not self.busy and self.mode.get() == "指定尺寸" else "disabled"
         self.width_input.configure(state=state)
         self.height_input.configure(state=state)
-        canvas_state = "normal" if not self.busy and LAYOUTS[self.layout.get()] in ("keep", "fit", "stretch") else "disabled"
+        canvas_state = "normal" if not self.busy and LAYOUTS[self.layout.get()] in ("keep", "fit", "canvas_fit", "stretch") else "disabled"
         self.canvas_width_input.configure(state=canvas_state)
         self.canvas_height_input.configure(state=canvas_state)
-        converting = not self.busy and LAYOUTS[self.layout.get()] in ("fit", "stretch")
+        converting = not self.busy and LAYOUTS[self.layout.get()] in ("fit", "canvas_fit", "stretch")
         self.resample_input.configure(state="readonly" if converting else "disabled")
         pixel_state = "readonly" if converting and RESAMPLERS[self.resample.get()] == "pixel" else "disabled"
         self.palette_input.configure(state=pixel_state)
@@ -381,7 +382,7 @@ class App(tk.Tk):
     def use_grid_canvas(self):
         info = self.current_info
         if not self.busy and info:
-            if LAYOUTS[self.layout.get()] not in ("keep", "fit", "stretch"):
+            if LAYOUTS[self.layout.get()] not in ("keep", "fit", "canvas_fit", "stretch"):
                 self.layout.set("主体不缩放 · 改画布")
             self.canvas_width.set(str(info.grid[0]))
             self.canvas_height.set(str(info.grid[1]))
@@ -510,7 +511,7 @@ class App(tk.Tk):
                 raise ValueError("输出宽、高必须是 1～1024 的整数") from None
         layout = LAYOUTS[self.layout.get()]
         canvas = None
-        if layout in ("keep", "fit", "stretch"):
+        if layout in ("keep", "fit", "canvas_fit", "stretch"):
             try:
                 canvas = int(self.canvas_width.get()), int(self.canvas_height.get())
             except ValueError:
