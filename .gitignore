@@ -10,3 +10,8 @@ perfect_pixel_settings.json
 # 本地测试图片
 /1/
 /2/
+frontend/node_modules/
+frontend/dist/
+build/
+dist/
+*.spec

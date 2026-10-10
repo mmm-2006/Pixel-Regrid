@@ -2,3 +2,4 @@ numpy==2.5.3
 opencv-python==5.0.0.93
 perfect-pixel==0.1.4
 Pillow==12.3.0
+pywebview==6.2.1

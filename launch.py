@@ -5,18 +5,25 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import sys
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 
 
 def main():
     try:
         logging.basicConfig(level=logging.INFO, handlers=[RotatingFileHandler(
             HERE / "perfect_pixel.log", maxBytes=1_000_000, backupCount=2, encoding="utf-8")])
-        from perfect_pixel_gui import App
-        App().mainloop()
+        if "--legacy" in sys.argv:
+            from perfect_pixel_gui import App
+            App().mainloop()
+        else:
+            from pixel_desktop import run
+            run()
     except Exception as exc:
         logging.exception("Application startup failed")
-        text = f"Perfect Pixel 启动失败：\n{exc}\n\n请保留项目的 .venv 文件夹。\n详情见 {HERE / 'perfect_pixel.log'}"
+        text = (f"Perfect Pixel 启动失败：\n{exc}\n\n"
+                "请确认已安装 requirements.txt 中的依赖，并构建 frontend 界面。\n"
+                "Windows 还需要 Microsoft Edge WebView2 Runtime。\n"
+                f"详情见 {HERE / 'perfect_pixel.log'}")
         if sys.platform == "win32":
             ctypes.windll.user32.MessageBoxW(None, text, "Perfect Pixel", 0x10)
         else:

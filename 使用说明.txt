@@ -1,5 +1,14 @@
 Perfect Pixel 像素画整理工具
 
+界面更新
+默认界面已迁移到 pywebview + Vue，独立桌面窗口，本地加载，无需打开浏览器。
+开发者首次运行请按 README.md 安装依赖并构建 frontend；Windows 需要 WebView2 Runtime。
+左侧图片库、中间预览、右侧参数；支持滚轮缩放、拖动平移和用途预设。
+高级设置默认收起。可导出选中图片或导出全部。
+并排预览同步操作；按 F 适应窗口，按 1 显示实际像素。
+本说明后续的“第 1～3 步”对应右侧输入方式、画布与尺寸、缩放算法。
+旧 Tkinter 界面可通过 python launch.py --legacy 打开。
+
 启动
 双击“启动PerfectPixel.bat”。使用现有 .venv 环境，不会联网或自动安装依赖。
 启动出错会显示原因；运行错误记录在 perfect_pixel.log（自动轮换，最多约 3 MB）。
