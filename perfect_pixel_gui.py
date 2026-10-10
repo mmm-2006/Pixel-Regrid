@@ -86,7 +86,9 @@ def scaling_text(info, options):
     if scale.exceeds_threshold:
         if any((source - target) * 100 > source * SCALE_CHANGE_THRESHOLD
                for source, target in zip(scale.source, scale.target)):
-            text += "尺寸变化超过 10%：可能丢失细线、高光，或出现断线、杂点；建议对比原图直接转换的效果。"
+            text += ("尺寸变化超过 10%：可能丢失细线、高光，或出现断线、杂点；"
+                     "请让 AI 降低主体的原生像素分辨率（减少像素格数、简化细节），"
+                     "或多生成几版进行“抽卡”挑选。")
         else:
             text += "尺寸变化超过 10%：放大不会补回细节，非整数倍放大可能使像素块粗细不均；请检查预览。"
     else:
