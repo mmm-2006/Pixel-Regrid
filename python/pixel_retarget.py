@@ -63,7 +63,7 @@ def _palette_labels(colors, limit, cancel):
     return palette, mapping[inverse]
 
 
-def target_pixels(image, size, palette_size=32, detail=1, cancel=None, wrap=False):
+def target_pixels(image, size, palette_size=32, detail=0, cancel=None, wrap=False):
     """Convert to an exact target grid using source colors, never averaged output colors."""
     _check_cancel(cancel)
     tw, th = size

@@ -33,7 +33,7 @@ class Options:
     canvas: tuple[int, int] | None = None
     resample: str = "nearest"
     palette_size: int = 32
-    detail: int = 1
+    detail: int = 0
     direct: bool = False
     alpha_threshold: int = 1
 

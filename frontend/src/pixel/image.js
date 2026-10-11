@@ -1,6 +1,6 @@
 import { clamp, roundEven } from './math.js'
 export const DEFAULTS = Object.freeze({ direct: false, method: 'center', layout: 'original', width: 32,
-  height: 32, resample: 'pixel', palette_size: 32, detail: 1, alpha_threshold: 1 })
+  height: 32, resample: 'pixel', palette_size: 32, detail: 0, alpha_threshold: 1 })
 export function validateOptions(input) {
   const o = { ...DEFAULTS, ...input }
   if (typeof o.direct !== 'boolean') throw new Error('输入方式有误')

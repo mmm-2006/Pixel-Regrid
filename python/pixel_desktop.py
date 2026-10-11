@@ -20,7 +20,7 @@ from pixel_ui_shared import (METHODS, LAYOUTS, RESAMPLERS, PALETTES, DETAILS,
 
 from pixel_paths import APP_HOME, RESOURCE_ROOT as HERE
 DEFAULTS = dict(direct=False, method="center", layout="original", width=32,
-                height=32, resample="pixel", palette_size=32, detail=1, alpha_threshold=1)
+                height=32, resample="pixel", palette_size=32, detail=0, alpha_threshold=1)
 
 
 def api_call(function):
@@ -76,7 +76,7 @@ def migrate_settings(settings):
                 layout=LAYOUTS.get(legacy.get("layout"), "original"),
                 resample=RESAMPLERS.get(legacy.get("resample"), "pixel"),
                 palette_size=PALETTES.get(legacy.get("palette"), 32),
-                detail=DETAILS.get(legacy.get("detail"), 1))
+                detail=DETAILS.get(legacy.get("detail"), 0))
     for field, old in (("width", "canvas_width"), ("height", "canvas_height"), ("alpha_threshold", "alpha_threshold")):
         value = legacy.get(old, data[field])
         maximum = 254 if field == "alpha_threshold" else 8192 if data["layout"] == "keep" else 1024

@@ -30,7 +30,7 @@ const pending = ref(false), preview = ref(null), previewError = ref('')
 const compare = ref(true), grid = ref(true), background = ref('checker')
 const camera = ref({ actual: false, factor: 1, x: 0, y: 0 }), outputScale = ref(1)
 const options = reactive({ direct: false, method: 'center', layout: 'original', width: 32,
-  height: 32, resample: 'pixel', palette_size: 32, detail: 1, alpha_threshold: 1 })
+  height: 32, resample: 'pixel', palette_size: 32, detail: 0, alpha_threshold: 1 })
 const activeFile = computed(() => files.value.find(file => file.key === activeKey.value))
 const resize = computed(() => ['fit', 'canvas_fit'].includes(options.layout))
 const successCount = computed(() => files.value.filter(file => file.status === 'success').length)
@@ -120,7 +120,7 @@ function selectFile(file, event) {
 function preset(kind) {
   const presets = {
     restore: { direct: false, layout: 'original' },
-    item: { layout: 'fit', width: 32, height: 32, resample: 'pixel', palette_size: 0, detail: 1 },
+    item: { layout: 'fit', width: 32, height: 32, resample: 'pixel', palette_size: 0, detail: 0 },
     block: { layout: 'canvas_fit', width: 16, height: 16, resample: 'k-centroid' },
   }
   Object.assign(options, presets[kind])

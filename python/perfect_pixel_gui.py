@@ -322,9 +322,9 @@ class App(tk.Tk):
         self.palette = tk.StringVar(value=self._setting("palette", "32 色"))
         if self.palette.get() not in PALETTES:
             self.palette.set("32 色")
-        self.detail = tk.StringVar(value=self._setting("detail", "适中"))
+        self.detail = tk.StringVar(value=self._setting("detail", "关闭"))
         if self.detail.get() not in DETAILS:
-            self.detail.set("适中")
+            self.detail.set("关闭")
         pixel_row = self.pixel_row = ttk.Frame(self.algorithm_step)
         pixel_row.pack(fill="x", pady=(8, 0))
         ttk.Label(pixel_row, text="目标像素颜色").pack(side="left")
