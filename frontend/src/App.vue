@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { Plus, FolderPlus, FolderOpen, ChevronDown, X,
   Grid2X2, ZoomIn, ZoomOut, Maximize, Download,
-  Trash2, LoaderCircle, CheckCircle2, CircleAlert } from 'lucide-vue-next'
+  Trash2, LoaderCircle, CheckCircle2, CircleAlert, CircleHelp } from 'lucide-vue-next'
 import PreviewCanvas from './PreviewCanvas.vue'
 import FileThumbnail from './FileThumbnail.vue'
 import { nextSelection, optionPayload, statusLabels, waitForBridge } from './bridge'
@@ -14,7 +14,7 @@ const revision = ref(-1), busy = ref(false), cancelling = ref(false), closing = 
 const status = ref('连接桌面应用…'), progress = ref({ done: 0, total: 0 }), details = ref([])
 const outputDir = ref(''), error = ref(''), showLog = ref(false), showHelp = ref(false)
 const pending = ref(false), preview = ref(null), previewError = ref('')
-const compare = ref(true), grid = ref(false), background = ref('checker')
+const compare = ref(true), grid = ref(true), background = ref('checker')
 const camera = ref({ actual: false, factor: 1, x: 0, y: 0 }), outputScale = ref(1)
 const options = reactive({ direct: false, method: 'center', layout: 'original', width: 32,
   height: 32, resample: 'pixel', palette_size: 32, detail: 1, alpha_threshold: 1 })
@@ -200,7 +200,16 @@ onBeforeUnmount(() => {
           </section>
           <section class="setting-section"><div class="section-heading">画布与尺寸</div><label class="field-label" for="layout">输出方式</label><select id="layout" v-model="options.layout"><option value="original">保持原画布</option><option value="fit">主体等比例缩放</option><option value="canvas_fit">整图等比例缩放</option><option value="keep">主体不缩放 · 改画布</option></select><p class="help-text">{{ layoutHelp }}</p>
             <label class="field-label">目标尺寸 <span v-if="options.layout === 'original'">选预设启用缩放</span></label><div class="dimension-inputs"><label><input v-model.number="options.width" type="number" min="1" :max="options.layout === 'keep' ? 8192 : 1024" aria-label="画布宽度" :disabled="options.layout === 'original'"/><span>宽</span></label><span>×</span><label><input v-model.number="options.height" type="number" min="1" :max="options.layout === 'keep' ? 8192 : 1024" aria-label="画布高度" :disabled="options.layout === 'original'"/><span>高</span></label><small>px</small></div><div class="size-presets"><button v-for="size in [16, 32, 64, 128]" :key="size" :class="{ chosen: options.layout !== 'original' && options.width === size && options.height === size }" @click="setSize(size)">{{ size }} × {{ size }}</button></div><div class="dimension-actions"><button :disabled="!preview?.info?.grid || pending" @click="useDimensions(false)">用输入尺寸</button><button :disabled="!preview?.info?.subject || pending" @click="useDimensions(true)">裁到主体大小</button></div>
-            <label class="threshold-field" for="alpha-threshold">透明噪点阈值<input id="alpha-threshold" v-model.number="options.alpha_threshold" type="number" min="0" max="254" aria-describedby="alpha-threshold-help"/></label><p id="alpha-threshold-help" class="help-text">范围 0～254，0 为关闭。默认 1：裁边时忽略透明度 ≤1 的外围杂点（0 完全透明，255 完全不透明）。值越大，越可能裁掉半透明边缘；仅影响裁剪范围，不修改范围内的像素。</p>
+            <div class="threshold-field">
+              <div class="threshold-label">
+                <label for="alpha-threshold">透明噪点阈值</label>
+                <span class="field-help">
+                  <button type="button" class="help-button" aria-label="透明噪点阈值说明" aria-describedby="alpha-threshold-help"><CircleHelp :size="14"/></button>
+                  <span id="alpha-threshold-help" class="field-tooltip" role="tooltip">范围 0～254，0 为关闭。默认 1：裁边时忽略透明度 ≤1 的外围杂点（0 完全透明，255 完全不透明）。值越大，越可能裁掉半透明边缘；仅影响裁剪范围，不修改范围内的像素。</span>
+                </span>
+              </div>
+              <input id="alpha-threshold" v-model.number="options.alpha_threshold" type="number" min="0" max="254" aria-describedby="alpha-threshold-help"/>
+            </div>
           </section>
           <section v-if="resize" class="setting-section"><div class="section-heading">缩放算法</div><select v-model="options.resample" aria-label="缩放算法"><option value="pixel">目标像素 · 结构保护</option><option value="nearest">像素硬边 · 最近邻</option><option value="k-centroid">k-centroid · 局部主色</option></select><p class="help-text">{{ algorithmHelp }}</p><div v-if="options.resample === 'pixel'" class="paired-fields"><label>目标颜色<select v-model.number="options.palette_size"><option :value="0">保留颜色</option><option v-for="n in [8, 16, 32, 64]" :key="n" :value="n">{{ n }} 色</option></select></label><label>细节保护<select v-model.number="options.detail"><option :value="0">关闭</option><option :value="1">适中</option><option :value="2">较强</option></select></label></div></section>
         </fieldset>
