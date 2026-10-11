@@ -23,7 +23,7 @@ def picture(path):
 def main():
     (ROOT / ".test_tmp").mkdir(exist_ok=True)
     examples = json.loads((ROOT / "docs/assets/examples.json").read_text(encoding="utf-8"))
-    example = next(item for item in examples["examples"] if item["name"] == "ice-cream-fit")
+    example = next(item for item in examples["examples"] if item["name"] == "ice-cream-grid")
     source_path = ROOT / example["source"]
     source = picture(source_path)
     result = picture(ROOT / "docs/assets" / example["output"]["file"])
