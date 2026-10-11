@@ -83,7 +83,7 @@ def main():
         blank = np.zeros((8, 8, 4), np.uint8)
         add(f"blank-{layout}", blank, Options(direct=True, layout=layout, canvas=(16, 16), resample="nearest"))
     add("undersized-canvas", image, Options(direct=True, layout="keep", canvas=(2, 2)))
-    folder = ROOT / "图片测试"
+    folder = ROOT / "test-images"
     samples = json.loads((folder / "samples.json").read_text(encoding="utf-8"))
     for sample in samples:
         path = folder / sample["file"]

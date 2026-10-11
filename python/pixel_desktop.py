@@ -489,7 +489,7 @@ def run():
             all(type(n) is int for n in geometry)):
         geometry = [1280, 780]
     screen = webview.screens[0]
-    api._window = webview.create_window("Perfect Pixel · 像素画整理", str(frontend), js_api=api,
+    api._window = webview.create_window("Pixel Regrid · 像素网格化", str(frontend), js_api=api,
         width=max(960, min(screen.width - 48, geometry[0])),
         height=max(640, min(screen.height - 80, geometry[1])),
         min_size=(960, 640), background_color="#f4f5f7", text_select=True)

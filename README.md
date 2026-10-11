@@ -1,6 +1,7 @@
-# Perfect Pixel · 像素画整理
+# Pixel Regrid
 
-本地桌面工具，用来还原 AI 像素风图片的色块网格，调整主体和画布，并批量导出指定尺寸的 PNG。
+将 AI 生成的伪像素画还原为规则像素网格，支持多种缩放算法、画布调整与批量导出。
+仓库名：`pixel-regrid`。
 界面简约，图片在本机处理，前端资源随程序存放，不使用 CDN。
 
 ## 两套桌面版本
@@ -9,8 +10,8 @@
 
 | 版本 | 实现 | 用途与启动方式 |
 |---|---|---|
-| Python 版 | pywebview + NumPy/OpenCV/perfect-pixel | 保留原有算法；双击 `启动PerfectPixel.bat` |
-| JavaScript 版 | Tauri + Rust 文件/图片接口 + JavaScript Worker | 轻量化实现；双击 `启动JavaScript版.bat`（需已有构建产物） |
+| Python 版 | pywebview + NumPy/OpenCV/perfect-pixel | 保留原有算法；双击 `启动PixelRegrid-Python.bat` |
+| JavaScript 版 | Tauri + Rust 文件/图片接口 + JavaScript Worker | 轻量化实现；双击 `启动PixelRegrid-JS.bat`（需已有构建产物） |
 
 Windows 两套版本都需要 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)，
 打开独立桌面窗口，无需手动打开浏览器。JavaScript 版运行时不需要 Python 或 Node.js。
@@ -34,14 +35,14 @@ frontend/src-tauri/       Tauri/Rust 桌面外壳
 frontend/tests/           JavaScript 自动测试
 scripts/                  两套构建脚本、Python 对照数据生成脚本
 docs/                     使用说明、JavaScript 构建指南与对照报告
-图片测试/                 本机测试原图与输出，不提交图片到 Git
+test-images/              本机测试原图与输出，不提交图片到 Git
 dist/                     两套版本的构建产物，不提交到 Git
 launch.py                 原有 Python 启动命令的兼容入口
-启动PerfectPixel.bat       原有 Python 双击启动入口
-启动JavaScript版.bat       JavaScript 双击启动入口
+启动PixelRegrid-Python.bat  Python 双击启动入口
+启动PixelRegrid-JS.bat      JavaScript 双击启动入口
 ```
 
-原来的 `1/`、`2/` 已合并到 `图片测试/`，已有输出保留在其中的 `perfect_pixel_output/`。
+原来的 `1/`、`2/` 已合并到 `test-images/`，已有输出保留在其中的 `perfect_pixel_output/`。
 本机虚拟环境仍位于 `.venv/`，Python 设置和日志仍保存在项目根目录，已有参数无需迁移。
 
 ## Python 版：源码运行
@@ -59,7 +60,7 @@ Set-Location ..
 .\.venv\Scripts\python.exe launch.py
 ```
 
-之后可直接双击 `启动PerfectPixel.bat`。启动不会联网安装依赖；修改前端后需要重新执行
+之后可直接双击 `启动PixelRegrid-Python.bat`。启动不会联网安装依赖；修改前端后需要重新执行
 `npm run build`。也可以直接运行 `python/launch.py`。
 旧 Tkinter 界面保留供回退与手动回归使用：
 
@@ -74,7 +75,7 @@ Python 打包入口：
 .\scripts\build_windows.ps1
 ```
 
-生成 `dist/PerfectPixel/`，发布时需要整个目录。用户无需安装 Python、Node.js 或 npm，
+生成 `dist/PixelRegrid-Python/`，发布时需要整个目录。用户无需安装 Python、Node.js 或 npm，
 但需要 WebView2。Python 发布包仍需在干净 Windows 环境验证。
 
 ## JavaScript 版：源码运行与打包
@@ -93,7 +94,7 @@ npm run desktop:dev
 .\scripts\build_javascript.ps1
 ```
 
-生成 `dist/PerfectPixel-JS/PerfectPixel-JS.exe`，无需携带 Python 环境。
+生成 `dist/PixelRegrid-JS/PixelRegrid-JS.exe`，无需携带 Python 环境。
 构建选项、测试方法和已知限制见 [JavaScript 指南](docs/JAVASCRIPT_PROTOTYPE.md)。
 
 ## 使用
@@ -106,6 +107,9 @@ npm run desktop:dev
 默认输出到每张原图旁的 `perfect_pixel_output/`，也可以选择统一保存位置。
 Python 设置保存在根目录 `perfect_pixel_settings.json`，错误写入 `perfect_pixel.log`；
 JavaScript 设置保存在独立的应用数据目录。
+
+改名后保留 Python 设置、日志及 `perfect_pixel_output/` 输出目录的旧命名，以兼容已有数据。
+JavaScript 应用标识为 `local.pixelregrid.desktop`，首次使用新设置目录时会读取旧实验版设置。
 
 Ctrl 点击多选，Shift 点击连续选择。Ctrl+O 添加图片，Ctrl+A 全选，Delete 移除列表选中项；
 F 适应窗口，1 显示实际像素。移除列表项不会删除原图。
@@ -136,5 +140,5 @@ npm run build
 ```
 
 `npm run dev` 可用于浏览器内检查界面样式；完整文件操作需要桌面桥接。
-跨版本算法对照见 [本地图片测试说明](图片测试/README.md)。
+跨版本算法对照见 [本地图片测试说明](test-images/README.md)。
 第三方许可与来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

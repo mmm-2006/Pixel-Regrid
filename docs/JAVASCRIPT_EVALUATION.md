@@ -2,6 +2,9 @@
 
 日期：2026-10-11。原始测试分支：`codex/javascript-prototype`。
 后续按用户要求合并到主分支，两套版本并存，Python 版完整保留。
+项目现名为 Pixel Regrid，仓库名为 `pixel-regrid`。下方体积和算法数据保留原型阶段的测量。
+改名后的回归验证包括 58 项 Python 非界面测试、14 项 JavaScript 测试和 4 项 Rust 测试；
+Rust 新增验证旧实验版设置的兼容读取与新设置优先级。
 
 ## 判断
 

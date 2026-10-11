@@ -19,12 +19,12 @@ def main():
             run()
     except Exception as exc:
         logging.exception("Application startup failed")
-        text = (f"Perfect Pixel 启动失败：\n{exc}\n\n"
+        text = (f"Pixel Regrid 启动失败：\n{exc}\n\n"
                 "请确认已安装 python/requirements.txt 中的依赖，并构建 frontend 界面。\n"
                 "Windows 还需要 Microsoft Edge WebView2 Runtime。\n"
                 f"详情见 {HERE / 'perfect_pixel.log'}")
         if sys.platform == "win32":
-            ctypes.windll.user32.MessageBoxW(None, text, "Perfect Pixel", 0x10)
+            ctypes.windll.user32.MessageBoxW(None, text, "Pixel Regrid", 0x10)
         else:
             print(text, file=sys.stderr)
         return 1

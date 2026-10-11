@@ -109,7 +109,7 @@ class PreviewRenderer:
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Perfect Pixel · 像素画整理")
+        self.title("Pixel Regrid · 像素网格化")
         self.geometry("1060x930")
         self.minsize(880, 900)
         self.settings = load_settings()
@@ -181,7 +181,7 @@ class App(tk.Tk):
         root.pack(fill="both", expand=True)
         root.columnconfigure(0, weight=1)
         root.rowconfigure(3, weight=1)
-        ttk.Label(root, text="Perfect Pixel · 像素画整理", font=("Microsoft YaHei UI", 17, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(root, text="Pixel Regrid · 像素网格化", font=("Microsoft YaHei UI", 17, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(root, text="整理 AI 像素风图片，或导出指定尺寸的 Minecraft 贴图。支持透明 PNG。", foreground="#555").grid(row=1, column=0, sticky="w", pady=(4, 12))
         toolbar = ttk.Frame(root)
         toolbar.grid(row=2, column=0, sticky="ew")

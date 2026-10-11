@@ -45,7 +45,7 @@ def main():
     api._samples = [good, bad]
     api._output_dir = str(root / "exports")
     api._options.update(direct=True, layout="fit", width=32, height=32)
-    api._window = webview.create_window("Perfect Pixel · 界面验证", str(HERE / "frontend/dist/index.html"),
+    api._window = webview.create_window("Pixel Regrid · 界面验证", str(HERE / "frontend/dist/index.html"),
                                         js_api=api, width=1000, height=680, min_size=(960, 640),
                                         background_color="#111315")
     api._window.events.closing += api._on_closing

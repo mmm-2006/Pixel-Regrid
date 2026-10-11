@@ -40,7 +40,7 @@ class ResourcePathsTests(unittest.TestCase):
 
     def test_frozen_resources_and_writable_settings_have_separate_locations(self):
         root = Path(__file__).resolve().parents[2]
-        executable = root / "dist/PerfectPixel/PerfectPixel.exe"
+        executable = root / "dist/PixelRegrid-Python/PixelRegrid-Python.exe"
         resources = executable.parent / "_internal"
         with patch.object(sys, "frozen", True, create=True), \
                 patch.object(sys, "_MEIPASS", str(resources), create=True), \

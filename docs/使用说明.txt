@@ -1,4 +1,4 @@
-Perfect Pixel 像素画整理工具
+Pixel Regrid · AI 伪像素画网格化工具
 
 界面更新
 Python 版使用 pywebview + Vue；JavaScript 版使用 Tauri + Vue。
@@ -11,8 +11,8 @@ Python 版使用 pywebview + Vue；JavaScript 版使用 Tauri + Vue。
 旧 Tkinter 界面可通过 python launch.py --legacy 打开。
 
 启动
-Python 版双击根目录“启动PerfectPixel.bat”。使用现有 .venv 环境，不会联网或自动安装依赖。
-JavaScript 版双击 dist/PerfectPixel-JS/PerfectPixel-JS.exe，无需 Python 环境。
+Python 版双击根目录“启动PixelRegrid-Python.bat”。使用现有 .venv 环境，不会联网或自动安装依赖。
+JavaScript 版双击 dist/PixelRegrid-JS/PixelRegrid-JS.exe，无需 Python 环境。
 启动出错会显示原因；运行错误记录在 perfect_pixel.log（自动轮换，最多约 3 MB）。
 
 日常使用

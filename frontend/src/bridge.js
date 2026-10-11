@@ -5,7 +5,7 @@ export async function waitForBridge() {
   }
   if (window.pywebview?.api) return window.pywebview.api
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('桌面连接未就绪，请通过启动PerfectPixel.bat 打开应用。')), 12000)
+    const timer = setTimeout(() => reject(new Error('桌面连接未就绪，请通过对应的启动脚本打开 Pixel Regrid。')), 12000)
     window.addEventListener('pywebviewready', () => {
       clearTimeout(timer)
       resolve(window.pywebview.api)

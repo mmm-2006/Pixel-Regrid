@@ -7,7 +7,7 @@ const args = ['metadata', '--locked', '--format-version', '1', '--filter-platfor
 if (process.argv.includes('--mirror')) args.unshift('--config', 'source.crates-io.replace-with="rsproxy"', '--config', 'source.rsproxy.registry="sparse+https://rsproxy.cn/index/"', '--offline')
 const metadata = JSON.parse(execFileSync('cargo', args, { cwd: project, encoding: 'utf8', maxBuffer: 20_000_000 }))
 const used = new Set(metadata.resolve.nodes.map(node => node.id))
-const sections = ['Perfect Pixel JS third-party notices\nIncludes Rust runtime/build dependencies and Tauri JavaScript adapters.\nApplication algorithm attribution is in THIRD_PARTY_NOTICES.md.\n']
+const sections = ['Pixel Regrid JS third-party notices\nIncludes Rust runtime/build dependencies and Tauri JavaScript adapters.\nApplication algorithm attribution is in THIRD_PARTY_NOTICES.md.\n']
 async function licenses(folder, title, fallback) {
   const files = (await readdir(folder)).filter(name => /^(license|copying|notice|copyright)([._-]|$)/i.test(name))
   const bodies = []
@@ -25,7 +25,7 @@ for (const name of ['@tauri-apps/api', '@tauri-apps/plugin-dialog']) {
   await licenses(folder, `${name} ${p.version}`, `License: ${p.license}`)
 }
 const argument = process.argv.find(arg => arg.startsWith('--output='))
-const output = argument ? argument.slice('--output='.length) : resolve(project, '../../dist/PerfectPixel-JS/RUST_NOTICES.txt')
+const output = argument ? argument.slice('--output='.length) : resolve(project, '../../dist/PixelRegrid-JS/RUST_NOTICES.txt')
 await mkdir(dirname(output), { recursive: true })
 await writeFile(output, sections.join('\n\n'), 'utf8')
 console.log(`Third-party notices: ${output}`)

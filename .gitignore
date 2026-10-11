@@ -8,9 +8,9 @@ perfect_pixel_settings.json
 **/perfect_pixel_output/
 
 # 本地测试图片
-/图片测试/*
-!/图片测试/README.md
-!/图片测试/samples.json
+/test-images/*
+!/test-images/README.md
+!/test-images/samples.json
 frontend/node_modules/
 frontend/dist/
 build/

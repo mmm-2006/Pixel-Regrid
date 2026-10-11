@@ -15,11 +15,11 @@ try {
         & npm.cmd run build
         if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
     } finally { Pop-Location }
-    & $taskPython -m PyInstaller --noconfirm --windowed --onedir --name PerfectPixel `
+    & $taskPython -m PyInstaller --noconfirm --windowed --onedir --name PixelRegrid-Python `
         --collect-all webview --collect-all clr_loader `
         --add-data 'frontend/dist;frontend/dist' `
         --add-data 'THIRD_PARTY_NOTICES.md;.' `
         --add-data 'docs/使用说明.txt;.' python/launch.py
     if ($LASTEXITCODE -ne 0) { throw 'Desktop packaging failed.' }
-    Write-Output 'Build complete: dist\PerfectPixel\PerfectPixel.exe'
+    Write-Output 'Build complete: dist\PixelRegrid-Python\PixelRegrid-Python.exe'
 } finally { Pop-Location }

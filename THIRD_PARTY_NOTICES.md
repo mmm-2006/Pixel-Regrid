@@ -136,6 +136,6 @@ The experimental desktop uses Tauri 2, its dialog plugin, Rust image codecs, and
 the Tauri JavaScript adapters. The exact Rust versions are pinned in
 frontend/src-tauri/Cargo.lock and JavaScript versions in frontend/package-lock.json.
 scripts/build_javascript.ps1 collects the packages' full license/notice files into
-dist/PerfectPixel-JS/RUST_NOTICES.txt for distribution alongside the executable.
+dist/PixelRegrid-JS/RUST_NOTICES.txt for distribution alongside the executable.
 The prototype does not include code copied from Real-PixelArt; that project was
 used as an architecture and package-size reference.

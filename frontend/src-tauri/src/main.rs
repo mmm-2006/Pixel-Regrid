@@ -124,8 +124,16 @@ fn open_output(path: String) -> Result<(), String> {
 }
 #[tauri::command]
 fn load_settings(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    let file = app.path().app_data_dir().map_err(|e| e.to_string())?.join("settings.json");
-    Ok(fs::read(file).ok().and_then(|s| serde_json::from_slice(&s).ok()).unwrap_or(serde_json::json!({})))
+    let folder = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(read_settings(&folder))
+}
+fn read_settings(folder: &Path) -> serde_json::Value {
+    let file = folder.join("settings.json");
+    // Existing preferences take priority; import the old app's preferences on first use.
+    let file = if file.exists() { file } else {
+        folder.parent().unwrap_or(folder).join("local.perfectpixel.javascript-prototype/settings.json")
+    };
+    fs::read(file).ok().and_then(|s| serde_json::from_slice(&s).ok()).unwrap_or(serde_json::json!({}))
 }
 #[tauri::command]
 fn store_settings(app: tauri::AppHandle, settings: serde_json::Value) -> Result<(), String> {
@@ -137,11 +145,27 @@ fn store_settings(app: tauri::AppHandle, settings: serde_json::Value) -> Result<
 fn main() {
     tauri::Builder::default().manage(Files::default()).plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![add_paths, scan_folder, cancel_scan, read_image, encode_preview, save_image, open_output, load_settings, store_settings])
-        .run(tauri::generate_context!()).expect("Perfect Pixel JS startup failed");
+        .run(tauri::generate_context!()).expect("Pixel Regrid startup failed");
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn renamed_app_loads_old_preferences_until_new_preferences_are_saved() {
+        let root = std::env::temp_dir().join(format!("pixel-regrid-settings-test-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let old = root.join("local.perfectpixel.javascript-prototype");
+        let current = root.join("local.pixelregrid.desktop");
+        fs::create_dir_all(&old).unwrap(); fs::create_dir(&current).unwrap();
+        assert_eq!(read_settings(&current), serde_json::json!({}));
+        fs::write(old.join("settings.json"), br#"{"width":16}"#).unwrap();
+        assert_eq!(read_settings(&current)["width"], 16);
+        fs::write(current.join("settings.json"), br#"{"width":32}"#).unwrap();
+        assert_eq!(read_settings(&current)["width"], 32);
+        fs::write(current.join("settings.json"), b"invalid").unwrap();
+        assert_eq!(read_settings(&current), serde_json::json!({}));
+        fs::remove_file(old.join("settings.json")).unwrap(); fs::remove_file(current.join("settings.json")).unwrap();
+        fs::remove_dir(old).unwrap(); fs::remove_dir(current).unwrap(); fs::remove_dir(root).unwrap();
+    }
     #[test]
     fn rgba_png_roundtrip_preserves_semitransparent_and_hidden_rgb() {
         let raw = [23, 79, 141, 1, 71, 11, 201, 0, 255, 0, 0, 128];
@@ -154,7 +178,7 @@ mod tests {
     fn unimported_read_is_rejected() { assert!(imported("unknown.png", &Files::default()).is_err()); }
     #[test]
     fn output_collisions_do_not_overwrite_source_or_existing_results() {
-        let folder = std::env::temp_dir().join(format!("perfect-pixel-js-test-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let folder = std::env::temp_dir().join(format!("pixel-regrid-test-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
         fs::create_dir(&folder).unwrap();
         let source = folder.join("原图.png"); fs::write(&source, b"original").unwrap();
         let first = write_output(&folder, "原图", b"first", 16, 16).unwrap();

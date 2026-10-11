@@ -19,10 +19,12 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
-根目录执行 `scripts/build_javascript.ps1` 会构建并将 EXE 复制到 `dist/PerfectPixel-JS`。
+根目录执行 `scripts/build_javascript.ps1` 会构建并将 EXE 复制到 `dist/PixelRegrid-JS`。
 首次构建会下载 Rust 依赖；官方源无法连接时可使用
 `./scripts/build_javascript.ps1 -UseRustMirror`，仅这次构建使用 rsproxy，不修改全局配置。
 实验版偏好设置写入独立的应用数据目录，不读写 Python 版设置。
+应用标识为 `local.pixelregrid.desktop`；新设置文件不存在时，会读取旧标识
+`local.perfectpixel.javascript-prototype` 下的设置，后续保存到新目录。
 
 ## 自动验证
 
@@ -40,7 +42,7 @@ cargo test --release --features custom-protocol
 ```
 
 对照覆盖透明裁边、画布布局、最近邻分数尺寸、自动/指定网格、中心/中位数/多数色取样、
-颜色预算、三种缩放、全透明图片、无效尺寸，并读取 `图片测试/samples.json` 指定的四张 PNG。
+颜色预算、三种缩放、全透明图片、无效尺寸，并读取 `test-images/samples.json` 指定的四张 PNG。
 原图只读，像素参考与详细结果保存在被 Git 忽略的 `prototype-results/`。
 
 JavaScript 单元测试还覆盖 FFT 的任意长度变换、后台线程缓存及像素数据传输、
