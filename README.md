@@ -3,6 +3,8 @@
 将 AI 生成的伪像素画还原为规则像素网格，并提供像素缩放、画布调整和批量导出。
 图片在本机处理。
 
+[在线使用](https://mmm-2006.github.io/Pixel-Regrid/) · [下载桌面版](https://github.com/mmm-2006/Pixel-Regrid/releases)
+
 ![Pixel Regrid 界面](docs/assets/interface.png)
 
 ## 功能
@@ -31,6 +33,9 @@
 以上均为 JavaScript 版实际处理结果，展示时按最近邻放大。
 
 ## 使用
+
+网页版直接打开 [Pixel Regrid](https://mmm-2006.github.io/Pixel-Regrid/)，添加或拖入图片即可使用，无需安装。
+图片在浏览器本地处理，不会上传；单张导出 PNG，多张打包 ZIP。GIF 仅处理静态帧。
 
 桌面版支持 Windows x64，需要 [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)。
 JavaScript 桌面包无需安装 Python 或 Node.js。

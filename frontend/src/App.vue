@@ -8,10 +8,11 @@ import FileThumbnail from './FileThumbnail.vue'
 import { nextSelection, optionPayload, statusLabels, waitForBridge } from './bridge'
 
 const api = ref(null)
+const browserMode = computed(() => api.value?.kind === 'browser')
 const connected = ref(false)
 const files = ref([]), selected = ref([]), activeKey = ref(null)
 const revision = ref(-1), busy = ref(false), cancelling = ref(false), closing = ref(false)
-const status = ref('连接桌面应用…'), progress = ref({ done: 0, total: 0 }), details = ref([])
+const status = ref('连接应用…'), progress = ref({ done: 0, total: 0 }), details = ref([])
 const outputDir = ref(''), error = ref(''), showLog = ref(false), showHelp = ref(false)
 const pending = ref(false), preview = ref(null), previewError = ref('')
 const compare = ref(true), grid = ref(true), background = ref('checker')
@@ -42,7 +43,7 @@ function applyState(state) {
 async function invoke(method, ...args) {
   error.value = ''
   try {
-    if (!api.value) throw new Error('桌面连接未就绪')
+    if (!api.value) throw new Error('应用尚未就绪')
     const result = await api.value[method](...args)
     if (!result?.ok) throw new Error(result?.error || '操作失败')
     applyState(result)
@@ -56,7 +57,7 @@ async function poll() {
     if (!result.ok) throw new Error(result.error)
     applyState(result); pollFailures = 0
   } catch {
-    if (++pollFailures === 3) error.value = '与桌面应用的连接中断，请重新打开应用。'
+    if (++pollFailures === 3) error.value = browserMode.value ? '应用状态异常，请刷新页面。' : '与桌面应用的连接中断，请重新打开应用。'
   } finally { if (!disposed) pollTimer = setTimeout(poll, 400) }
 }
 function schedulePreview() {
@@ -128,6 +129,9 @@ async function exportFiles(all) {
   pending.value = false
   await invoke('start_export', all ? files.value.map(file => file.key) : selected.value, optionPayload(options))
 }
+function dropFiles(event) {
+  if (browserMode.value && !busy.value) invoke('add_files', [...event.dataTransfer.files])
+}
 function keydown(event) {
   if (event.target.matches('input, select, textarea') || showHelp.value || showLog.value) return
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); if (!busy.value) invoke('choose_files') }
@@ -150,11 +154,12 @@ onBeforeUnmount(() => {
   disposed = true; generation++
   clearTimeout(pollTimer); clearTimeout(previewTimer)
   window.removeEventListener('keydown', keydown)
+  api.value?.dispose?.()
 })
 </script>
 
 <template>
-  <div class="app-shell" @dragover.prevent @drop.prevent>
+  <div class="app-shell" @dragover.prevent @drop.prevent="dropFiles">
     <div v-if="error" class="error-banner" role="alert"><CircleAlert :size="17"/><span>{{ error }}</span><button aria-label="关闭错误提示" @click="error = ''"><X :size="16"/></button></div>
 
     <main class="workspace">
@@ -176,7 +181,7 @@ onBeforeUnmount(() => {
 
       <section class="preview-workspace">
         <div class="preview-toolbar"><div class="segmented"><button :class="{ active: compare }" @click="compare = true">并排对比</button><button :class="{ active: !compare }" @click="compare = false">处理结果</button></div>
-          <div class="preview-tools"><button class="icon-button" :class="{ toggled: grid }" title="像素网格（放大后显示）" aria-label="切换像素网格" @click="grid = !grid"><Grid2X2 :size="17"/></button><select v-model="background" class="background-select" aria-label="预览背景"><option value="checker">透明背景</option><option value="dark">深色背景</option><option value="light">浅色背景</option></select></div></div>
+          <div class="preview-tools"><button class="icon-button" :class="{ toggled: grid }" :aria-pressed="grid" title="像素网格（放大后显示）" aria-label="切换像素网格" @click="grid = !grid"><Grid2X2 :size="17"/></button><select v-model="background" class="background-select" aria-label="预览背景"><option value="checker">透明背景</option><option value="dark">深色背景</option><option value="light">浅色背景</option></select></div></div>
 
         <div v-if="!activeFile" class="main-empty"><h2>未选择图片</h2><p>从左侧添加图片，或直接拖入窗口</p></div>
         <template v-else>
@@ -216,8 +221,8 @@ onBeforeUnmount(() => {
       </aside>
     </main>
 
-    <footer class="export-bar"><div class="export-destination"><FolderOpen :size="19"/><div><span>保存位置</span><button :title="outputDir || '每张原图旁的 perfect_pixel_output 文件夹'" :disabled="busy || !connected" @click="invoke('choose_output')">{{ outputDir || '原图旁的 perfect_pixel_output' }}<ChevronDown :size="13"/></button></div><button v-if="outputDir" class="text-button" :disabled="busy" @click="invoke('choose_output', true)">恢复默认</button></div>
-      <div class="export-actions"><button class="icon-button" title="打开输出文件夹" aria-label="打开输出文件夹" :disabled="!successCount" @click="invoke('open_output', activeKey)"><FolderOpen :size="19"/></button><template v-if="busy"><button class="button cancel-button" :disabled="cancelling || closing" @click="invoke('cancel')"><X :size="16"/>{{ cancelling ? '正在取消…' : '取消处理' }}</button><button class="button primary" disabled><LoaderCircle :size="16" class="spin"/>{{ progress.total ? `${progress.done} / ${progress.total}` : '扫描中…' }}</button></template><template v-else><button class="button" :disabled="!selected.length || !connected" @click="exportFiles(false)">导出选中 <span class="button-count">{{ selected.length }}</span></button><button class="button primary" :disabled="!files.length || !connected" @click="exportFiles(true)"><Download :size="17"/>导出全部</button></template></div>
+    <footer class="export-bar"><div class="export-destination"><FolderOpen :size="19"/><div><span>保存位置</span><div v-if="browserMode">浏览器下载目录 · 多张打包 ZIP</div><button v-else :title="outputDir || '每张原图旁的 perfect_pixel_output 文件夹'" :disabled="busy || !connected" @click="invoke('choose_output')">{{ outputDir || '原图旁的 perfect_pixel_output' }}<ChevronDown :size="13"/></button></div><button v-if="outputDir && !browserMode" class="text-button" :disabled="busy" @click="invoke('choose_output', true)">恢复默认</button></div>
+      <div class="export-actions"><button v-if="browserMode" class="button" :disabled="busy || !successCount" @click="invoke('open_output')"><Download :size="14"/>下载结果</button><button v-else class="icon-button" title="打开输出文件夹" aria-label="打开输出文件夹" :disabled="!successCount" @click="invoke('open_output', activeKey)"><FolderOpen :size="19"/></button><template v-if="busy"><button class="button cancel-button" :disabled="cancelling || closing" @click="invoke('cancel')"><X :size="16"/>{{ cancelling ? '正在取消…' : '取消处理' }}</button><button class="button primary" disabled><LoaderCircle :size="16" class="spin"/>{{ progress.total ? `${progress.done} / ${progress.total}` : '扫描中…' }}</button></template><template v-else><button class="button" :disabled="!selected.length || !connected" @click="exportFiles(false)">导出选中 <span class="button-count">{{ selected.length }}</span></button><button class="button primary" :disabled="!files.length || !connected" @click="exportFiles(true)"><Download :size="17"/>导出全部</button></template></div>
     </footer>
     <div class="status-bar"><span class="status-copy">{{ status }}</span><button @click="showLog = true">处理记录</button></div>
     <div v-if="busy && progress.total" class="batch-progress"><span :style="{ width: `${progress.done / progress.total * 100}%` }"/></div>

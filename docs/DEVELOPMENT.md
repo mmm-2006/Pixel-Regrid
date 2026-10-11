@@ -28,7 +28,9 @@ npm ci
 npm run desktop:dev
 ```
 
-`npm run dev` 仅用于浏览器内调试界面，完整文件操作需在桌面版中验证。
+`npm run dev` 可运行完整网页版；`npm run build:web` 生成 `frontend/dist-web/`。
+网页版与桌面 JS 版共用算法 Worker，文件读取、PNG 编码和下载由浏览器完成。
+普通 `npm run build` 生成桌面前端，Python 的桥接等待逻辑保持独立。
 生成发行目录和版本化 ZIP：
 
 ```powershell
@@ -95,6 +97,7 @@ Set-Location python
 ```
 
 GitHub Actions 配置位于 [ci.yml](../.github/workflows/ci.yml)。
+网页版部署与浏览器验证见 [网页版指南](WEB.md)。
 历史测试结果见 [对照报告](JAVASCRIPT_EVALUATION.md) 和 [发布验证](RELEASE_VALIDATION.md)。
 
 ## 设置与展示素材
