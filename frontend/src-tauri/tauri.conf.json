@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Perfect Pixel JS",
+  "version": "0.1.0",
+  "identifier": "local.perfectpixel.javascript-prototype",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{ "title": "Perfect Pixel · JavaScript 实验版", "width": 1280, "height": 820, "minWidth": 1000, "minHeight": 640, "backgroundColor": "#f4f5f7" }],
+    "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; form-action 'none'" }
+  },
+  "bundle": { "active": false, "icon": [] }
+}

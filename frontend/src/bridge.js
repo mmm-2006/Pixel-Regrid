@@ -1,4 +1,8 @@
 export async function waitForBridge() {
+  if (window.__TAURI_INTERNALS__) {
+    const { createTauriBridge } = await import('./tauriBridge.js')
+    return createTauriBridge()
+  }
   if (window.pywebview?.api) return window.pywebview.api
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('桌面连接未就绪，请通过启动PerfectPixel.bat 打开应用。')), 12000)

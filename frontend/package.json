@@ -6,14 +6,20 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build --no-bundle"
   },
   "dependencies": {
-    "vue": "3.5.43",
-    "lucide-vue-next": "0.468.0"
+    "@tauri-apps/api": "2.12.2",
+    "@tauri-apps/plugin-dialog": "2.8.1",
+    "lucide-vue-next": "0.468.0",
+    "vue": "3.5.43"
   },
   "devDependencies": {
-    "vite": "8.3.4",
-    "@vitejs/plugin-vue": "6.0.5"
+    "@tauri-apps/cli": "2.12.1",
+    "@vitejs/plugin-vue": "6.0.5",
+    "vite": "8.3.4"
   }
 }
