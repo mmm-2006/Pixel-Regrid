@@ -9,6 +9,10 @@ import { nextSelection, optionPayload, statusLabels, waitForBridge } from './bri
 
 const api = ref(null)
 const browserMode = computed(() => api.value?.kind === 'browser')
+const narrowScreen = ref(false), mobilePanel = ref('images'), mobileOriginal = ref(false), mobileMultiSelect = ref(false), thresholdHelpOpen = ref(false)
+const mobileLayout = computed(() => browserMode.value && narrowScreen.value)
+let mobileQuery
+const updateMobileLayout = () => { narrowScreen.value = mobileQuery.matches }
 const connected = ref(false)
 const files = ref([]), selected = ref([]), activeKey = ref(null)
 const revision = ref(-1), busy = ref(false), cancelling = ref(false), closing = ref(false)
@@ -91,14 +95,19 @@ watch(options, () => {
   else { clearTimeout(previewTimer); previewTimer = setTimeout(() => invoke('configure', optionPayload(options)), 350) }
 }, { deep: true })
 watch(activeKey, () => { preview.value = null; camera.value = { actual: false, factor: 1, x: 0, y: 0 }; schedulePreview() })
+watch(() => files.value.length, (count, previous) => {
+  if (mobileLayout.value && count && !previous) mobilePanel.value = 'preview'
+  if (!count) mobilePanel.value = 'images'
+})
 function selectFile(file, event) {
   if (event.shiftKey && activeKey.value) {
     const a = files.value.findIndex(item => item.key === activeKey.value), b = files.value.indexOf(file)
     selected.value = files.value.slice(Math.min(a, b), Math.max(a, b) + 1).map(item => item.key)
-  } else if (event.ctrlKey || event.metaKey) {
+  } else if (event.ctrlKey || event.metaKey || (mobileLayout.value && mobileMultiSelect.value)) {
     selected.value = selected.value.includes(file.key) ? selected.value.filter(key => key !== file.key) : [...selected.value, file.key]
   } else selected.value = [file.key]
   activeKey.value = selected.value.includes(file.key) ? file.key : selected.value[0] || null
+  if (mobileLayout.value && !mobileMultiSelect.value) mobilePanel.value = 'preview'
 }
 function preset(kind) {
   const presets = {
@@ -141,6 +150,8 @@ function keydown(event) {
   if (event.key === '1') resetView(true)
 }
 onMounted(async () => {
+  mobileQuery = window.matchMedia('(max-width: 900px)')
+  updateMobileLayout(); mobileQuery.addEventListener('change', updateMobileLayout)
   window.addEventListener('keydown', keydown)
   try {
     api.value = await waitForBridge()
@@ -154,16 +165,22 @@ onBeforeUnmount(() => {
   disposed = true; generation++
   clearTimeout(pollTimer); clearTimeout(previewTimer)
   window.removeEventListener('keydown', keydown)
+  mobileQuery?.removeEventListener('change', updateMobileLayout)
   api.value?.dispose?.()
 })
 </script>
 
 <template>
-  <div class="app-shell" @dragover.prevent @drop.prevent="dropFiles">
+  <div class="app-shell" :class="{ 'browser-app': browserMode }" @dragover.prevent @drop.prevent="dropFiles">
     <div v-if="error" class="error-banner" role="alert"><CircleAlert :size="17"/><span>{{ error }}</span><button aria-label="关闭错误提示" @click="error = ''"><X :size="16"/></button></div>
 
-    <main class="workspace">
-      <aside class="library">
+    <nav v-if="browserMode" class="mobile-nav" role="tablist" aria-label="手机导航">
+      <button id="mobile-images-tab" role="tab" :aria-selected="mobilePanel === 'images'" aria-controls="image-library" @click="mobilePanel = 'images'">图片 <span>{{ files.length }}</span></button>
+      <button id="mobile-preview-tab" role="tab" :aria-selected="mobilePanel === 'preview'" aria-controls="image-preview" @click="mobilePanel = 'preview'">预览</button>
+      <button id="mobile-settings-tab" role="tab" :aria-selected="mobilePanel === 'settings'" aria-controls="image-settings" @click="mobilePanel = 'settings'">设置</button>
+    </nav>
+    <main class="workspace" :data-mobile-panel="mobilePanel">
+      <aside id="image-library" class="library" :role="mobileLayout ? 'tabpanel' : undefined" :aria-labelledby="mobileLayout ? 'mobile-images-tab' : undefined">
         <div class="panel-title"><h2>图片 <span>{{ files.length }}</span></h2></div>
         <div class="import-actions"><button class="button" :disabled="busy || !connected" @click="invoke('choose_files')"><Plus :size="14"/>添加图片</button><button class="button" title="添加文件夹（包含子文件夹）" :disabled="busy || !connected" @click="invoke('choose_folder')"><FolderPlus :size="14"/>文件夹</button></div>
         <div class="library-content">
@@ -176,28 +193,28 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <div class="library-footer"><span>已选 {{ selected.length }} 张</span><div><button class="text-button" :disabled="!files.length" @click="selected = files.map(file => file.key)">全选</button><button class="icon-button" title="移除选中（保留源文件）" aria-label="移除选中" :disabled="busy || !selected.length" @click="invoke('remove_files', selected)"><Trash2 :size="15"/></button></div></div>
+        <div class="library-footer"><span>已选 {{ selected.length }} 张</span><div><button v-if="mobileLayout" class="text-button" :aria-pressed="mobileMultiSelect" @click="mobileMultiSelect = !mobileMultiSelect">{{ mobileMultiSelect ? '完成多选' : '多选' }}</button><button class="text-button" :disabled="!files.length" @click="selected = files.map(file => file.key)">全选</button><button class="icon-button" title="移除选中（保留源文件）" aria-label="移除选中" :disabled="busy || !selected.length" @click="invoke('remove_files', selected)"><Trash2 :size="15"/></button></div></div>
       </aside>
 
-      <section class="preview-workspace">
-        <div class="preview-toolbar"><div class="segmented"><button :class="{ active: compare }" @click="compare = true">并排对比</button><button :class="{ active: !compare }" @click="compare = false">处理结果</button></div>
+      <section id="image-preview" class="preview-workspace" :role="mobileLayout ? 'tabpanel' : undefined" :aria-labelledby="mobileLayout ? 'mobile-preview-tab' : undefined">
+        <div class="preview-toolbar"><div v-if="mobileLayout" class="segmented"><button :class="{ active: mobileOriginal }" :aria-pressed="mobileOriginal" @click="mobileOriginal = true">原图</button><button :class="{ active: !mobileOriginal }" :aria-pressed="!mobileOriginal" @click="mobileOriginal = false">结果</button></div><div v-else class="segmented"><button :class="{ active: compare }" @click="compare = true">并排对比</button><button :class="{ active: !compare }" @click="compare = false">处理结果</button></div>
           <div class="preview-tools"><button class="icon-button" :class="{ toggled: grid }" :aria-pressed="grid" title="像素网格（放大后显示）" aria-label="切换像素网格" @click="grid = !grid"><Grid2X2 :size="17"/></button><select v-model="background" class="background-select" aria-label="预览背景"><option value="checker">透明背景</option><option value="dark">深色背景</option><option value="light">浅色背景</option></select></div></div>
 
-        <div v-if="!activeFile" class="main-empty"><h2>未选择图片</h2><p>从左侧添加图片，或直接拖入窗口</p></div>
+        <div v-if="!activeFile" class="main-empty"><h2>未选择图片</h2><p>{{ mobileLayout ? '在“图片”中添加图片即可开始' : '从左侧添加图片，或直接拖入窗口' }}</p><button v-if="mobileLayout" class="button" :disabled="busy || !connected" @click="invoke('choose_files')"><Plus :size="16"/>添加图片</button></div>
         <template v-else>
           <div class="current-file"><strong :title="activeFile.path">{{ activeFile.name }}</strong><span v-if="pending" class="updating"><LoaderCircle :size="13" class="spin"/>更新预览</span><span v-else class="preview-label">{{ preview?.saved ? '已保存结果' : '实时预览' }}</span></div>
-          <div class="preview-panes" :class="{ single: !compare }">
-            <article v-if="compare" class="image-pane"><div class="image-heading"><span>原图</span><small v-if="preview?.original">{{ preview.original.width }} × {{ preview.original.height }}</small></div><PreviewCanvas :image="preview?.original" :camera="camera" :grid="grid" :background="background" @camera="camera = $event"/></article>
-            <article class="image-pane"><div class="image-heading"><span>{{ preview?.saved ? '已导出' : '处理结果' }}</span><small v-if="preview?.output">{{ preview.output.width }} × {{ preview.output.height }}</small></div><PreviewCanvas :image="preview?.output" :camera="camera" :grid="grid" :background="background" @camera="camera = $event" @scale="outputScale = $event"/>
+          <div class="preview-panes" :class="{ single: !compare || mobileLayout }">
+            <article v-if="mobileLayout ? mobileOriginal : compare" class="image-pane"><div class="image-heading"><span>原图</span><small v-if="preview?.original">{{ preview.original.width }} × {{ preview.original.height }}</small></div><PreviewCanvas :image="preview?.original" :camera="camera" :grid="grid" :background="background" :compact="mobileLayout" @camera="camera = $event" @scale="mobileLayout && (outputScale = $event)"/></article>
+            <article v-if="!mobileLayout || !mobileOriginal" class="image-pane"><div class="image-heading"><span>{{ preview?.saved ? '已导出' : '处理结果' }}</span><small v-if="preview?.output">{{ preview.output.width }} × {{ preview.output.height }}</small></div><PreviewCanvas :image="preview?.output" :camera="camera" :grid="grid" :background="background" :compact="mobileLayout" @camera="camera = $event" @scale="outputScale = $event"/>
               <div v-if="previewError || preview?.error" class="preview-error" role="alert"><CircleAlert :size="23"/><strong>暂时无法生成预览</strong><p>{{ previewError || preview.error }}</p><button class="button" :disabled="pending" @click="schedulePreview">重新预览</button></div>
             </article>
           </div>
-          <div class="zoom-toolbar"><span>滚轮缩放 · 拖动平移</span><div><button class="icon-button" title="缩小" aria-label="缩小" @click="zoom(.5)"><ZoomOut :size="17"/></button><span class="zoom-value">{{ Math.round(outputScale * 100) }}%</span><button class="icon-button" title="放大" aria-label="放大" @click="zoom(2)"><ZoomIn :size="17"/></button><span class="divider"/><button class="text-button" title="实际像素（1）" @click="resetView(true)">1:1</button><button class="icon-button" title="适应窗口（F）" aria-label="适应窗口" @click="resetView()"><Maximize :size="16"/></button></div></div>
+          <div class="zoom-toolbar"><span>{{ mobileLayout ? '拖动平移 · 按钮缩放' : '滚轮缩放 · 拖动平移' }}</span><div><button class="icon-button" title="缩小" aria-label="缩小" @click="zoom(.5)"><ZoomOut :size="17"/></button><span class="zoom-value">{{ Math.round(outputScale * 100) }}%</span><button class="icon-button" title="放大" aria-label="放大" @click="zoom(2)"><ZoomIn :size="17"/></button><span class="divider"/><button class="text-button" title="实际像素（1）" @click="resetView(true)">1:1</button><button class="icon-button" title="适应窗口（F）" aria-label="适应窗口" @click="resetView()"><Maximize :size="16"/></button></div></div>
           <div class="preview-info"><span>{{ preview?.info_text || (pending ? '正在识别图片…' : '选择参数查看预览') }}</span><p v-if="preview?.scaling_text" :class="{ attention: preview.attention }"><CircleAlert v-if="preview.attention" :size="14"/>{{ preview.scaling_text }}</p></div>
         </template>
       </section>
 
-      <aside class="settings-panel"><div class="panel-title"><h2>处理设置</h2><button class="text-button" @click="showHelp = true">帮助</button></div>
+      <aside id="image-settings" class="settings-panel" :role="mobileLayout ? 'tabpanel' : undefined" :aria-labelledby="mobileLayout ? 'mobile-settings-tab' : undefined"><div class="panel-title"><h2>处理设置</h2><button class="text-button" @click="showHelp = true">帮助</button></div>
         <fieldset class="settings-scroll" :disabled="busy || !connected">
           <section class="setting-section"><div class="section-heading">预设</div><div class="preset-actions"><button @click="preset('restore')">网格还原</button><button @click="preset('item')">物品图标</button><button @click="preset('block')">方块贴图</button></div></section>
           <section class="setting-section"><div class="section-heading">输入方式</div><div class="segmented full"><button :class="{ active: !options.direct }" @click="options.direct = false">自动识别网格</button><button :class="{ active: options.direct }" @click="options.direct = true">原图直接转换</button></div><p class="help-text">{{ options.direct ? '跳过网格识别，直接调整原图。' : '识别像素色块，将放大的图片还原成真实像素。' }}</p>
@@ -208,8 +225,8 @@ onBeforeUnmount(() => {
             <div class="threshold-field">
               <div class="threshold-label">
                 <label for="alpha-threshold">透明噪点阈值</label>
-                <span class="field-help">
-                  <button type="button" class="help-button" aria-label="透明噪点阈值说明" aria-describedby="alpha-threshold-help"><CircleHelp :size="14"/></button>
+                <span class="field-help" :class="{ open: thresholdHelpOpen }">
+                  <button type="button" class="help-button" aria-label="透明噪点阈值说明" aria-describedby="alpha-threshold-help" :aria-expanded="mobileLayout ? thresholdHelpOpen : undefined" @click="thresholdHelpOpen = mobileLayout && !thresholdHelpOpen" @keydown.esc="thresholdHelpOpen = false"><CircleHelp :size="14"/></button>
                   <span id="alpha-threshold-help" class="field-tooltip" role="tooltip">范围 0～254，0 为关闭。默认 1：裁边时忽略透明度 ≤1 的外围杂点（0 完全透明，255 完全不透明）。值越大，越可能裁掉半透明边缘；仅影响裁剪范围，不修改范围内的像素。</span>
                 </span>
               </div>

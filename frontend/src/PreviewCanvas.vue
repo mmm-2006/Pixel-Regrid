@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-const props = defineProps({ image: Object, camera: Object, grid: Boolean, background: String })
+const props = defineProps({ image: Object, camera: Object, grid: Boolean, background: String, compact: Boolean })
 const emit = defineEmits(['camera', 'scale'])
 const canvas = ref(null)
 const host = ref(null)
@@ -19,7 +19,8 @@ function dimensions() {
 function scale() {
   if (!props.image) return 1
   const { w, h } = dimensions()
-  const fit = Math.min((w - 56) / props.image.width, (h - 56) / props.image.height)
+  const margin = props.compact ? 24 : 56
+  const fit = Math.min((w - margin) / props.image.width, (h - margin) / props.image.height)
   return (props.camera.actual ? 1 : Math.max(.001, fit)) * props.camera.factor
 }
 function draw() {
@@ -66,7 +67,7 @@ watch(() => props.image?.src, src => {
   image.onload = () => { if (version === imageVersion) { bitmap = image; redraw() } }
   image.src = src
 }, { immediate: true })
-watch(() => [props.camera, props.grid, props.background], redraw, { deep: true })
+watch(() => [props.camera, props.grid, props.background, props.compact], redraw, { deep: true })
 onMounted(() => { observer = new ResizeObserver(redraw); observer.observe(host.value); redraw() })
 onBeforeUnmount(() => { observer?.disconnect(); if (frame) cancelAnimationFrame(frame) })
 function pointerDown(event) {
