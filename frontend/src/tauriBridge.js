@@ -76,6 +76,7 @@ export async function createTauriBridge(runtime = {}) {
     return snapshot()
   }
   const methods = {
+    async license_notices() { return { ok: true, text: await invoke('license_notices') } },
     async bootstrap() {
       settings = await invoke('load_settings')
       try { options = validateOptions(settings.options || {}) } catch { options = { ...DEFAULTS } }

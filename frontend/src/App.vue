@@ -18,6 +18,14 @@ const files = ref([]), selected = ref([]), activeKey = ref(null)
 const revision = ref(-1), busy = ref(false), cancelling = ref(false), closing = ref(false)
 const status = ref('连接应用…'), progress = ref({ done: 0, total: 0 }), details = ref([])
 const outputDir = ref(''), error = ref(''), showLog = ref(false), showHelp = ref(false)
+const showLicenses = ref(false), licenseText = ref(''), licenseLoading = ref(false)
+async function openLicenses() {
+  licenseLoading.value = true
+  try {
+    const result = await invoke('license_notices')
+    if (result) { licenseText.value = result.text; showHelp.value = false; showLicenses.value = true }
+  } finally { licenseLoading.value = false }
+}
 const pending = ref(false), preview = ref(null), previewError = ref('')
 const compare = ref(true), grid = ref(true), background = ref('checker')
 const camera = ref({ actual: false, factor: 1, x: 0, y: 0 }), outputScale = ref(1)
@@ -142,7 +150,8 @@ function dropFiles(event) {
   if (browserMode.value && !busy.value) invoke('add_files', [...event.dataTransfer.files])
 }
 function keydown(event) {
-  if (event.target.matches('input, select, textarea') || showHelp.value || showLog.value) return
+  if (event.key === 'Escape') { showLicenses.value = showHelp.value = showLog.value = false; return }
+  if (event.target.matches('input, select, textarea') || showHelp.value || showLog.value || showLicenses.value) return
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); if (!busy.value) invoke('choose_files') }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); selected.value = files.value.map(file => file.key) }
   if (event.key === 'Delete' && !busy.value) invoke('remove_files', selected.value)
@@ -236,7 +245,8 @@ onBeforeUnmount(() => {
           <section v-if="resize" class="setting-section"><div class="section-heading">缩放算法</div><select v-model="options.resample" aria-label="缩放算法"><option value="pixel">目标像素 · 结构保护</option><option value="nearest">像素硬边 · 最近邻</option><option value="k-centroid">k-centroid · 局部主色</option></select><p class="help-text">{{ algorithmHelp }}</p><div v-if="options.resample === 'pixel'" class="paired-fields"><label>目标颜色<select v-model.number="options.palette_size"><option :value="0">保留颜色</option><option v-for="n in [8, 16, 32, 64]" :key="n" :value="n">{{ n }} 色</option></select></label><label>细节保护<select v-model.number="options.detail"><option :value="0">关闭</option><option :value="1">适中</option><option :value="2">较强</option></select></label></div></section>
         </fieldset>
       </aside>
-    </main>
+      <div v-if="showLicenses" class="modal-backdrop" @click.self="showLicenses = false"><section class="modal license-modal" role="dialog" aria-modal="true" aria-label="许可与第三方声明"><div class="modal-heading"><h2>许可与第三方声明</h2><button class="icon-button" aria-label="关闭弹窗" @click="showLicenses = false"><X :size="20"/></button></div><pre tabindex="0">{{ licenseText }}</pre></section></div>
+  </main>
 
     <footer class="export-bar"><div class="export-destination"><FolderOpen :size="19"/><div><span>保存位置</span><div v-if="browserMode">浏览器下载目录 · 多张打包 ZIP</div><button v-else :title="outputDir || '每张原图旁的 perfect_pixel_output 文件夹'" :disabled="busy || !connected" @click="invoke('choose_output')">{{ outputDir || '原图旁的 perfect_pixel_output' }}<ChevronDown :size="13"/></button></div><button v-if="outputDir && !browserMode" class="text-button" :disabled="busy" @click="invoke('choose_output', true)">恢复默认</button></div>
       <div class="export-actions"><button v-if="browserMode" class="button" :disabled="busy || !successCount" @click="invoke('open_output')"><Download :size="14"/>下载结果</button><button v-else class="icon-button" title="打开输出文件夹" aria-label="打开输出文件夹" :disabled="!successCount" @click="invoke('open_output', activeKey)"><FolderOpen :size="19"/></button><template v-if="busy"><button class="button cancel-button" :disabled="cancelling || closing" @click="invoke('cancel')"><X :size="16"/>{{ cancelling ? '正在取消…' : '取消处理' }}</button><button class="button primary" disabled><LoaderCircle :size="16" class="spin"/>{{ progress.total ? `${progress.done} / ${progress.total}` : '扫描中…' }}</button></template><template v-else><button class="button" :disabled="!selected.length || !connected" @click="exportFiles(false)">导出选中 <span class="button-count">{{ selected.length }}</span></button><button class="button primary" :disabled="!files.length || !connected" @click="exportFiles(true)"><Download :size="17"/>导出全部</button></template></div>
@@ -244,6 +254,6 @@ onBeforeUnmount(() => {
     <div class="status-bar"><span class="status-copy">{{ status }}</span><button @click="showLog = true">处理记录</button></div>
     <div v-if="busy && progress.total" class="batch-progress"><span :style="{ width: `${progress.done / progress.total * 100}%` }"/></div>
 
-    <div v-if="showLog || showHelp" class="modal-backdrop" @click.self="showLog = showHelp = false"><section class="modal" role="dialog" aria-modal="true" :aria-label="showLog ? '处理记录' : '操作帮助'"><div class="modal-heading"><h2>{{ showLog ? '处理记录' : '操作帮助' }}</h2><button class="icon-button" aria-label="关闭弹窗" @click="showLog = showHelp = false"><X :size="20"/></button></div><template v-if="showLog"><p v-if="!details.length" class="help-text">导出后在这里查看结果路径和失败原因。</p><pre v-for="(detail, index) in details" :key="index">{{ detail }}</pre></template><template v-else><p>添加图片 → 选择用途或调整参数 → 检查预览 → 导出。</p><p class="help-text">自动识别适合具有一致色块网格的像素风图片。识别失败时，可切换“原图直接转换”。“物品图标”会裁透明边再等比例缩放，“方块贴图”会将整图等比例缩放到 16×16 画布，比例不同时补透明边。</p><div class="shortcut-list"><span>添加图片<kbd>Ctrl O</kbd></span><span>全选图片<kbd>Ctrl A</kbd></span><span>移除选中<kbd>Delete</kbd></span><span>适应窗口<kbd>F</kbd></span><span>实际像素<kbd>1</kbd></span></div><p class="help-text">Ctrl 点击多选，Shift 点击选择连续图片。滚轮缩放，拖动平移；网格在像素足够大时显示。并排预览同步操作，两张图分别以适应窗口为基准缩放。</p><p class="help-text">批量导出时，修改参数会暂时禁用。取消或退出会等待当前图片完成，已经保存的结果会保留。</p></template></section></div>
+    <div v-if="showLog || showHelp" class="modal-backdrop" @click.self="showLog = showHelp = false"><section class="modal" role="dialog" aria-modal="true" :aria-label="showLog ? '处理记录' : '操作帮助'"><div class="modal-heading"><h2>{{ showLog ? '处理记录' : '操作帮助' }}</h2><button class="icon-button" aria-label="关闭弹窗" @click="showLog = showHelp = false"><X :size="20"/></button></div><template v-if="showLog"><p v-if="!details.length" class="help-text">导出后在这里查看结果路径和失败原因。</p><pre v-for="(detail, index) in details" :key="index">{{ detail }}</pre></template><template v-else><p>添加图片 → 选择用途或调整参数 → 检查预览 → 导出。</p><p class="help-text">自动识别适合具有一致色块网格的像素风图片。识别失败时，可切换“原图直接转换”。“物品图标”会裁透明边再等比例缩放，“方块贴图”会将整图等比例缩放到 16×16 画布，比例不同时补透明边。</p><div class="shortcut-list"><span>添加图片<kbd>Ctrl O</kbd></span><span>全选图片<kbd>Ctrl A</kbd></span><span>移除选中<kbd>Delete</kbd></span><span>适应窗口<kbd>F</kbd></span><span>实际像素<kbd>1</kbd></span></div><p class="help-text">Ctrl 点击多选，Shift 点击选择连续图片。滚轮缩放，拖动平移；网格在像素足够大时显示。并排预览同步操作，两张图分别以适应窗口为基准缩放。</p><p class="help-text">批量导出时，修改参数会暂时禁用。取消或退出会等待当前图片完成，已经保存的结果会保留。</p><button v-if="api?.license_notices" class="text-button" :disabled="licenseLoading" @click="openLicenses">{{ licenseLoading ? '读取中…' : '许可与第三方声明' }}</button></template></section></div>
   </div>
 </template>

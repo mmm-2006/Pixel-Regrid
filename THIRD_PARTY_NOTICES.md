@@ -157,8 +157,11 @@ SOFTWARE.
 The experimental desktop uses Tauri 2, its dialog plugin, Rust image codecs, and
 the Tauri JavaScript adapters. The exact Rust versions are pinned in
 frontend/src-tauri/Cargo.lock and JavaScript versions in frontend/package-lock.json.
-scripts/build_javascript.ps1 collects the packages' full license/notice files into
-dist/PixelRegrid-JS/RUST_NOTICES.txt for distribution alongside the executable.
+frontend/scripts/native-notices.mjs collects the packages' full license/notice
+texts and compresses them into the desktop executable. They are available in
+Help → License and third-party notices, or by running the executable with
+--licenses. No companion notice files are required for the JavaScript EXE.
+Exact-version upstream license supplements are in frontend/scripts/license-supplements/.
 
 # Real-PixelArt architecture reference
 

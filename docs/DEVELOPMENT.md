@@ -31,7 +31,7 @@ npm run desktop:dev
 `npm run dev` 可运行完整网页版；`npm run build:web` 生成 `frontend/dist-web/`。
 网页版与桌面 JS 版共用算法 Worker，文件读取、PNG 编码和下载由浏览器完成。
 普通 `npm run build` 生成桌面前端，Python 的桥接等待逻辑保持独立。
-生成发行目录和版本化 ZIP：
+生成桌面 EXE 和版本化发布文件：
 
 ```powershell
 Set-Location ..
@@ -39,9 +39,12 @@ Set-Location ..
 .\scripts\package_release.ps1
 ```
 
-程序位于 `dist/PixelRegrid-JS/`，ZIP 和 `SHA256SUMS.txt` 位于 `dist/`。
+程序位于 `dist/PixelRegrid-JS/`，版本化 EXE 和 `SHA256SUMS.txt` 位于 `dist/`。
+EXE 已内置完整许可，可单独分发；`package_release.ps1 -Zip` 可额外生成仅包含 EXE 的 ZIP。
 Rust 官方源下载较慢时，可对本次构建使用 `build_javascript.ps1 -UseRustMirror`。
-打包脚本会检查版本号，并拒绝覆盖已有的版本化发布目录和 ZIP。
+打包脚本会检查版本号、验证内置许可，并拒绝覆盖已有的版本化 EXE 和 ZIP。
+源码仓库仍保留 `LICENSE` 和第三方声明。许可压缩包在构建时生成，不提交到 Git。
+发布包内的文本可从“帮助 → 许可与第三方声明”查看，或执行 `PixelRegrid-JS.exe --licenses` 读取。
 更多桌面接口说明与已知限制见 [JavaScript 指南](JAVASCRIPT_PROTOTYPE.md)。
 
 ## Python 版
@@ -82,6 +85,7 @@ node frontend/scripts/compare.mjs
 Set-Location frontend
 npm test
 npm run build
+npm run licenses
 Set-Location src-tauri
 cargo test --locked --release --features custom-protocol
 ```

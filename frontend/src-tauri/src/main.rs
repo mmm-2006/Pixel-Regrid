@@ -142,14 +142,37 @@ fn store_settings(app: tauri::AppHandle, settings: serde_json::Value) -> Result<
     fs::write(&temp, serde_json::to_vec_pretty(&settings).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     fs::rename(temp, dest).map_err(|e| e.to_string())
 }
+#[tauri::command]
+fn license_notices() -> Result<String, String> {
+    use std::io::Read;
+    let bytes = include_bytes!("../gen/license-notices.gz");
+    let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
+    let mut text = String::new();
+    decoder.read_to_string(&mut text).map_err(|e| e.to_string())?;
+    Ok(text)
+}
 fn main() {
+    if std::env::args().any(|arg| arg == "--licenses") {
+        match license_notices().and_then(|text| std::io::stdout().write_all(text.as_bytes()).map_err(|e| e.to_string())) {
+            Ok(()) => return,
+            Err(error) => { eprintln!("{error}"); std::process::exit(1); }
+        }
+    }
     tauri::Builder::default().manage(Files::default()).plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![add_paths, scan_folder, cancel_scan, read_image, encode_preview, save_image, open_output, load_settings, store_settings])
+        .invoke_handler(tauri::generate_handler![add_paths, scan_folder, cancel_scan, read_image, encode_preview, save_image, open_output, load_settings, store_settings, license_notices])
         .run(tauri::generate_context!()).expect("Pixel Regrid startup failed");
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn embedded_licenses_include_project_and_dependency_texts() {
+        let text = license_notices().unwrap();
+        assert!(text.contains(include_str!("../../../LICENSE")));
+        assert!(text.contains(include_str!("../../../THIRD_PARTY_NOTICES.md")));
+        assert!(text.contains("Mozilla Public License Version 2.0"));
+        assert!(text.contains("@tauri-apps/api 2.12.2"));
+    }
     #[test]
     fn renamed_app_loads_old_preferences_until_new_preferences_are_saved() {
         let root = std::env::temp_dir().join(format!("pixel-regrid-settings-test-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));

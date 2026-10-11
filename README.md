@@ -40,7 +40,7 @@
 桌面版支持 Windows x64，需要 [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)。
 JavaScript 桌面包无需安装 Python 或 Node.js。
 
-1. 从 [Releases](https://github.com/mmm-2006/Pixel-Regrid/releases) 下载桌面 ZIP，解压并运行 `PixelRegrid-JS.exe`。
+1. 从 [Releases](https://github.com/mmm-2006/Pixel-Regrid/releases) 下载 Windows EXE，双击运行。
 2. 添加图片，选择自动识别网格，按需调整缩放算法和画布尺寸。
 3. 检查预览后导出。结果另存为 PNG，原图保留。
 
@@ -60,3 +60,4 @@ JavaScript 桌面包无需安装 Python 或 Node.js。
 ## 许可证
 
 原创代码与自制示例采用 [MIT](LICENSE) 许可证。第三方来源与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+桌面 EXE 内置许可原文，可在“帮助 → 许可与第三方声明”查看。

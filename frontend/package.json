@@ -10,6 +10,7 @@
     "test:browser": "node scripts/browser-smoke.mjs",
     "test": "node --test tests/*.test.js",
     "tauri": "tauri",
+    "licenses": "node scripts/native-notices.mjs",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build --no-bundle"
   },

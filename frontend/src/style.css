@@ -146,6 +146,8 @@ input:disabled, select:disabled { color: var(--faint); background: var(--base); 
 .modal { width: 540px; max-width: 100%; max-height: 80vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 5px; padding: 20px; }
 .modal-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .modal-heading h2 { font-size: 15px; font-weight: 600; }
+.license-modal { width: 800px; }
+.license-modal .modal-heading { position: sticky; top: -20px; padding: 12px 0; background: var(--panel); }
 .modal pre { font: 12px/1.8 'Segoe UI', 'Microsoft YaHei UI', sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; background: var(--base); border: 1px solid var(--border); border-radius: 3px; }
 .modal .help-text { font-size: 12px; margin-top: 14px; }
 .shortcut-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; margin-top: 16px; }

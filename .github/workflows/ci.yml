@@ -51,9 +51,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci --no-audit --no-fund
         working-directory: frontend
+      - run: npm run licenses
+        working-directory: frontend
       - run: npm run build
         working-directory: frontend
       - run: cargo test --locked --release --features custom-protocol
         working-directory: frontend/src-tauri
       - run: cargo build --locked --release --features custom-protocol
         working-directory: frontend/src-tauri
+      - run: node frontend/scripts/verify-embedded-licenses.mjs

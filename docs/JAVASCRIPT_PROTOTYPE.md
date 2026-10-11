@@ -37,6 +37,7 @@ node frontend/scripts/compare.mjs
 
 cd frontend
 npm test
+npm run licenses
 cd src-tauri
 cargo test --release --features custom-protocol
 ```

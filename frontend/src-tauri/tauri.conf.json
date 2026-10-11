@@ -4,9 +4,9 @@
   "version": "0.1.0-beta.1",
   "identifier": "local.pixelregrid.desktop",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "npm run licenses && npm run dev",
     "devUrl": "http://127.0.0.1:5173",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run licenses && npm run build",
     "frontendDist": "../dist"
   },
   "app": {

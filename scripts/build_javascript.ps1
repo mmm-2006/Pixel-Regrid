@@ -6,6 +6,8 @@ try {
     & npm.cmd ci --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw 'npm dependency installation failed.' }
     if ($UseRustMirror) {
+        & npm.cmd run licenses -- --mirror
+        if ($LASTEXITCODE -ne 0) { throw 'Embedded license generation failed.' }
         & npm.cmd run build
         if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
         Push-Location src-tauri
@@ -20,14 +22,7 @@ try {
     $taskDestination = Join-Path $taskProjectRoot 'dist\PixelRegrid-JS'
     New-Item -ItemType Directory -Force -Path $taskDestination | Out-Null
     Copy-Item -LiteralPath 'src-tauri\target\release\pixel-regrid.exe' -Destination (Join-Path $taskDestination 'PixelRegrid-JS.exe')
-    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'THIRD_PARTY_NOTICES.md') -Destination $taskDestination
-    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'LICENSE') -Destination $taskDestination
-    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\使用说明.txt') -Destination $taskDestination
-    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\JAVASCRIPT_PROTOTYPE.md') -Destination $taskDestination
-    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\JAVASCRIPT_EVALUATION.md') -Destination $taskDestination
-    $taskNotices = "--output=$(Join-Path $taskDestination 'RUST_NOTICES.txt')"
-    if ($UseRustMirror) { & node scripts/native-notices.mjs --mirror $taskNotices }
-    else { & node scripts/native-notices.mjs $taskNotices }
-    if ($LASTEXITCODE -ne 0) { throw 'Third-party notice generation failed.' }
+    & node scripts/verify-embedded-licenses.mjs (Join-Path $taskDestination 'PixelRegrid-JS.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Single-EXE license verification failed.' }
     Write-Output "Build complete: $taskDestination\PixelRegrid-JS.exe"
 } finally { Pop-Location }

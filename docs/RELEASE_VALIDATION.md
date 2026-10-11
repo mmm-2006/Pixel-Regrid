@@ -59,10 +59,20 @@ node frontend/scripts/compare.mjs
 Set-Location frontend
 npm test
 npm run build
+npm run licenses
 Set-Location src-tauri
 cargo test --locked --release --features custom-protocol
 cargo build --locked --release --features custom-protocol
 ```
 
 上述构建完成后回到仓库根目录，可运行 `scripts/build_javascript.ps1` 收集发行目录，
-再运行 `scripts/package_release.ps1` 生成版本化 ZIP；不要将 `dist/` 提交到 Git。
+再运行 `scripts/package_release.ps1` 生成版本化 EXE（`-Zip` 可额外打包）；不要将 `dist/` 提交到 Git。
+
+## 单 EXE 内置许可验证（2026-10-11）
+
+- 新产物：`dist/PixelRegrid-v0.1.0-beta.1-windows-x64-js.exe`，4,163,072 字节（约 3.97 MiB）。上文 ZIP 测量属于此前的外置许可版本。
+- 项目及第三方许可原文共 2,411,607 字节，压缩后 105,603 字节，编译进 EXE；运行时无需外部许可文件。
+- 打包检查将 EXE 单独复制到空目录，执行 `--licenses`，与生成的全部许可逐字节一致，目录没有产生其他文件。
+- 17 项 JavaScript 测试、5 项 Rust 测试通过。隔离无头浏览器确认许可弹窗可完整显示、滚动、关闭及按 Escape 退出。
+- 网页和手机浏览器回归通过，覆盖导入、网格还原、裁边、k-centroid、PNG/ZIP 导出和触摸操作。
+- 本次复用已有依赖与工具链，没有重做干净 Windows 系统或原生桌面窗口的人工回归。
