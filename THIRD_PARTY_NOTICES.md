@@ -152,9 +152,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-# Tauri JavaScript prototype
+# Tauri JavaScript desktop
 
-The experimental desktop uses Tauri 2, its dialog plugin, Rust image codecs, and
+The JavaScript desktop uses Tauri 2, its dialog plugin, Rust image codecs, and
 the Tauri JavaScript adapters. The exact Rust versions are pinned in
 frontend/src-tauri/Cargo.lock and JavaScript versions in frontend/package-lock.json.
 frontend/scripts/native-notices.mjs collects the packages' full license/notice

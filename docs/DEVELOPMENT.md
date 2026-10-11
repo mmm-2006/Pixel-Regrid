@@ -107,7 +107,7 @@ GitHub Actions 配置位于 [ci.yml](../.github/workflows/ci.yml)。
 ## 设置与展示素材
 
 Python 的设置和日志位于仓库根目录，沿用 `perfect_pixel_settings.json` 和 `perfect_pixel.log`。
-JavaScript 使用应用数据目录，标识为 `local.pixelregrid.desktop`；新设置不存在时读取旧实验版设置。
+JavaScript 使用应用数据目录，标识为 `local.pixelregrid.desktop`；新设置不存在时读取旧版设置。
 设置、日志、依赖目录和构建产物均不提交到 Git。
 
 README 效果图由 `scripts/create_readme_examples.py` 生成，使用 `test-images/` 中的冰淇淋和附魔台顶面原图，

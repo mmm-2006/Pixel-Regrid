@@ -133,7 +133,7 @@ export function restoreGrid(image, options) {
     ys = Array.from({ length: gh + 1 }, (_, i) => Math.floor(i * h / gh))
   } else {
     if (Math.min(w, h) < 16) throw new GridError('图片过小，无法可靠识别网格；请选择原图直接转换')
-    if (w * h > 4_000_000) throw new GridError('实验版网格识别最多处理 400 万像素，请缩小原图或直接转换')
+    if (w * h > 4_000_000) throw new GridError('网格识别最多处理 400 万像素，请缩小原图或直接转换')
     const gray = grayImage(image), [gx, gy] = gradient(gray, w, h)
     let [gw, gh] = fftGrid(gray, w, h)
     if (!gw || !gh || Math.min(w / gw, h / gh) < 4 || Math.max(w / gw, h / gh) > 20 || (w / gw) / (h / gh) > 1.5 || (h / gh) / (w / gw) > 1.5) [gw, gh] = gradientGrid(gx, gy, w, h)

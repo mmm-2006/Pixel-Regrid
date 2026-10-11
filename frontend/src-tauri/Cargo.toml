@@ -1,6 +1,6 @@
 [package]
 name = "pixel-regrid"
-version = "0.1.0-beta.1"
+version = "1.0.0"
 description = "Restore AI-generated pixel art grids, resize images and adjust canvases"
 edition = "2021"
 license = "MIT"

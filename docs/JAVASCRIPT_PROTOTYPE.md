@@ -1,4 +1,4 @@
-# JavaScript 轻量化实验
+# JavaScript 版说明
 
 JavaScript 版从 `codex/javascript-prototype` 合并到主分支，与 Python 版并存。
 Python 源码位于 `python/`，原来的 `launch.py` 和双击启动方式保留。
@@ -22,7 +22,7 @@ npm run desktop:build
 根目录执行 `scripts/build_javascript.ps1` 会构建并将 EXE 复制到 `dist/PixelRegrid-JS`。
 首次构建会下载 Rust 依赖；官方源无法连接时可使用
 `./scripts/build_javascript.ps1 -UseRustMirror`，仅这次构建使用 rsproxy，不修改全局配置。
-实验版偏好设置写入独立的应用数据目录，不读写 Python 版设置。
+JavaScript 版偏好设置写入独立的应用数据目录，不读写 Python 版设置。
 应用标识为 `local.pixelregrid.desktop`；新设置文件不存在时，会读取旧标识
 `local.perfectpixel.javascript-prototype` 下的设置，后续保存到新目录。
 
@@ -51,7 +51,7 @@ JavaScript 单元测试还覆盖 FFT 的任意长度变换、后台线程缓存�
 批处理遇错继续、参数快照、取消和关闭等待当前保存。Rust 测试核对 PNG 编解码
 是否保留半透明和完全透明像素的 RGB，并拒绝读取未导入的文件。
 
-## 实验限制
+## 已知限制
 
 - k-centroid 使用确定性的双聚类实现，未复制 Pillow MAXCOVERAGE 的初始化和量化细节。
   多数色取样同样采用确定性聚类，不能保证与 OpenCV 聚类逐像素一致。
@@ -59,10 +59,10 @@ JavaScript 单元测试还覆盖 FFT 的任意长度变换、后台线程缓存�
   可能改变调色板选色和局部投票；对照报告会保留这些差异。
 - 纯 JavaScript 大图 FFT 当前比 Python/NumPy 慢。已缓存还原网格，改画布尺寸不必重复识别，
   但首次识别仍需要优化。识别取消通过终止 Worker 生效，导出取消等待当前图片完成。
-- 实验版自动网格识别最多处理 400 万像素，直接转换的读取上限仍为 3200 万像素。
+- 自动网格识别最多处理 400 万像素，直接转换的读取上限仍为 3200 万像素。
 - 图片按导入后的读取缓存使用；外部修改原图后应移除并重新导入。
 - Rust 格式解码与 OpenCV 的 JPEG、WebP、TIFF、色彩配置文件处理仍需进一步对照。
 - 用户已进行桌面手动试用并反馈没有发现问题；编译与算法测试不代表完整的发布兼容性验证。
 
-JavaScript 版继续保留实验限制，不替代 Python 版。测量结果见
+JavaScript 与 Python 两套实现的测量结果见
 [JAVASCRIPT_EVALUATION.md](JAVASCRIPT_EVALUATION.md)。

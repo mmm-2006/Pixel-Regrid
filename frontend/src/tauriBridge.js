@@ -19,7 +19,7 @@ export async function createTauriBridge(runtime = {}) {
   const invoke = runtime.invoke || nativeInvoke, open = runtime.open || nativeOpen
   const currentWindow = runtime.window || getCurrentWindow()
   const state = { ok: true, revision: 0, files: [], busy: false, cancelling: false, closing: false,
-    progress: { done: 0, total: 0 }, status: 'JavaScript 实验版就绪', details: [], output_dir: '' }
+    progress: { done: 0, total: 0 }, status: '就绪', details: [], output_dir: '' }
   let options = { ...DEFAULTS }, settings = {}, lastOutput = '', cached = null, previewGeneration = 0, sourceSerial = 0
   const createLane = runtime.createLane || (() => new WorkerLane())
   const previewLane = createLane(), exportLane = createLane()

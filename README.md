@@ -61,3 +61,5 @@ JavaScript 桌面包无需安装 Python 或 Node.js。
 
 原创代码与自制示例采用 [MIT](LICENSE) 许可证。第三方来源与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 桌面 EXE 内置许可原文，可在“帮助 → 许可与第三方声明”查看。
+
+当前版本说明见 [v1.0.0](docs/releases/v1.0.0.md)。
