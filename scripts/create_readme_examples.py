@@ -94,7 +94,7 @@ def main():
     comparison('ice-cream-layout-comparison.png', [
         (pictures['ice-cream-grid'], '还原画布 · 42 × 42', '主体 20 × 35，四周保留留白'),
         (pictures['ice-cream-crop'], '裁剪画布 · 20 × 35', '去掉透明留白，主体像素不变'),
-        (pictures['ice-cream-fit'], '缩放画布 · 20 × 32', '等比缩放 · 主体 18 × 32 · 结构保护'),
+        (pictures['ice-cream-fit'], '缩放画布 · 20 × 32', '主体 18 × 32 · 64 色 · 细节保护关闭'),
     ], zoom=8)
     comparison('enchanting-table-comparison.png', [
         (pictures['enchanting-table-grid'], '自动识别 · 30 × 30 网格', 'AI 原图：1254 × 1254'),

@@ -97,8 +97,8 @@
         "resample": "pixel",
         "width": 20,
         "height": 32,
-        "palette_size": 32,
-        "detail": 1,
+        "palette_size": 64,
+        "detail": 0,
         "alpha_threshold": 1
       },
       "info": {
