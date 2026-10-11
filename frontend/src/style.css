@@ -115,12 +115,8 @@ input:disabled, select:disabled { color: var(--faint); background: var(--base); 
 .paired-fields { display: flex; gap: 8px; margin-top: 12px; }
 .paired-fields label { flex: 1; color: var(--muted); font-size: 12px; min-width: 0; }
 .paired-fields select { margin-top: 5px; }
-.advanced summary { list-style: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 12px; color: var(--muted); }
-.advanced summary::-webkit-details-marker { display: none; }
-.advanced[open] summary > svg { transform: rotate(180deg); }
-.advanced-content { margin-top: 14px; }
-.advanced-content select, .advanced-content input { margin-top: 6px; }
-.advanced-content .field-label + .field-label { margin-top: 12px; }
+.threshold-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; font-size: 12px; color: var(--muted); }
+.threshold-field input { width: 76px; flex-shrink: 0; font-family: Consolas, monospace; }
 .export-bar { min-height: 64px; padding: 10px 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--border-strong); background: var(--panel); }
 .export-destination { display: flex; align-items: center; gap: 10px; color: var(--muted); min-width: 0; }
 .export-destination > div { min-width: 0; }
