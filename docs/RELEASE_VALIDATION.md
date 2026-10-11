@@ -6,7 +6,8 @@
 
 - Windows 11 家庭版中文版，10.0.26100，x64。
 - Python 3.13.0、Node.js 24.14.1、Rust/Cargo 1.98.1，已安装 Visual Studio C++ 构建工具与 Windows SDK。
-- 从 Git 暂存区导出独立源码目录，未复制现有 `.venv`、`node_modules`、`target`、构建产物、设置或个人测试图片。
+- 从 Git 暂存区导出独立源码目录，未复制现有 `.venv`、`node_modules`、`target`、构建产物或设置。
+  当次验证未包含 `test-images/` 样本（当时尚未纳入 Git）。
 - 新建 Python 虚拟环境；官方 PyPI 下载发生 SSL 超时，改用清华 PyPI 镜像完成安装。`pip check` 无依赖冲突。
 - `npm ci` 根据 `package-lock.json` 安装；Rust 根据 `Cargo.lock` 使用此前下载的 rsproxy 缓存，全新 `target` 编译。
 - 复用本机工具链和下载缓存；这是干净源码/依赖安装验证，不是重装系统或干净 Windows 虚拟机验证。
@@ -22,7 +23,7 @@
 | 锁定依赖的 Rust release 构建 | 通过，使用 `custom-protocol` 嵌入前端资源 |
 | Python/JavaScript 对照 | 43 例，38 例完全匹配或同为预期错误，5 例存在差异，要求完全一致的项目无失败 |
 
-对照仅使用生成的透明/网格样例和随源码提供的自制扰动图片，不依赖私人图片。
+当次对照仅使用生成的透明/网格样例和随源码提供的自制扰动图片，未读取 `test-images/` 样本。
 差异集中在限色、结构保护与 k-centroid，并未把这些差异判定为等价。
 详细算法差异及历史个人图片测量见 [JavaScript 评估](JAVASCRIPT_EVALUATION.md)。
 
@@ -33,7 +34,7 @@
 
 README 界面图由真实 Vue 前端在隔离的无头浏览器中渲染，使用演示桥接数据。
 处理对比图由自制样例经过实际 Python 网格还原生成；不是实际 AI 图片，也不是手工修整的输出。
-个人测试图片、设置和日志不提交，不进入发布包。
+测试图片现随源码提供；设置和日志不提交，桌面发布包不包含测试图片。
 
 发布包包含 EXE、使用说明、版本说明、验证记录、项目 MIT 许可证与第三方许可。
 ZIP 的 SHA-256 放在旁边的 `SHA256SUMS.txt`，发布时二者应一起上传。
