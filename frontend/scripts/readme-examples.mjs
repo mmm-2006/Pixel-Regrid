@@ -15,7 +15,7 @@ for (const input of inputs) {
   const variants = input.name === 'ice-cream'
     ? [['grid', {}], ['crop', { layout: 'keep', width: restored.info.subject[0], height: restored.info.subject[1] }],
       ['fit', { layout: 'fit', width: 20, height: 32 }]]
-    : [['grid', {}], ['fit', { layout: 'canvas_fit', width: 32, height: 32 }]]
+    : [['grid', {}], ['fit', { layout: 'canvas_fit', width: 32, height: 32, resample: 'k-centroid' }]]
   for (const [variant, changes] of variants) {
     const options = { ...base, ...changes }
     const result = layoutPrepared(prepared.image, prepared.recovery, options)

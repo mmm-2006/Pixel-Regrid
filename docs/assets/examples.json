@@ -183,7 +183,7 @@
         "direct": false,
         "method": "center",
         "layout": "canvas_fit",
-        "resample": "pixel",
+        "resample": "k-centroid",
         "width": 32,
         "height": 32,
         "palette_size": 32,

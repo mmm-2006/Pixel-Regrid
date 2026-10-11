@@ -98,7 +98,7 @@ def main():
     ], zoom=8)
     comparison('enchanting-table-comparison.png', [
         (pictures['enchanting-table-grid'], '自动识别 · 30 × 30 网格', 'AI 原图：1254 × 1254'),
-        (pictures['enchanting-table-fit'], '缩放结果 · 32 × 32', '整图等比例缩放 · 结构保护'),
+        (pictures['enchanting-table-fit'], '缩放结果 · 32 × 32', '整图等比例缩放 · k-centroid'),
     ], zoom=12)
     (ASSETS / 'examples.json').write_text(json.dumps(dict(implementation='JavaScript', examples=records),
                                                     ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
