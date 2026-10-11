@@ -1,8 +1,33 @@
 # Pixel Regrid
 
 将 AI 生成的伪像素画还原为规则像素网格，支持多种缩放算法、画布调整与批量导出。
-仓库名：`pixel-regrid`。
 界面简约，图片在本机处理，前端资源随程序存放，不使用 CDN。
+
+[下载与发布](https://github.com/mmm-2006/Pixel-Regrid/releases) · [使用说明](docs/使用说明.txt) · [MIT 许可证](LICENSE)
+
+![Pixel Regrid 界面](docs/assets/interface.png)
+
+界面展示使用自制样例与隔离的演示数据；文件选择、拖放等系统操作需要在桌面版中使用。
+
+![网格还原前后对比](docs/assets/demo-comparison.png)
+
+左图是脚本生成的 384×384 扰动样例，模拟网格不齐、色块杂色和模糊边缘；右图是程序实际还原的
+16×16 结果，按最近邻放大展示。此样例用于复现流程，不是真实 AI 生成图片，也不代表所有图片的效果。
+示例图片与生成脚本随源码提供，个人测试图片不参与发布。
+
+## 快速使用
+
+首个预发布版本为 `v0.1.0-beta.1`，Windows x64 JavaScript 包名为
+`PixelRegrid-v0.1.0-beta.1-windows-x64-js.zip`。上传后的安装包放在上方 Releases 页面；
+GitHub 自动生成的 “Source code” ZIP 是源码，不包含桌面 EXE。
+
+1. 下载桌面 ZIP 并解压，双击 `PixelRegrid-JS.exe`。需要 Microsoft Edge WebView2 Runtime。
+2. 添加图片，先使用“自动识别网格”；按需选择缩放算法与画布尺寸，并检查并排预览。
+3. 点击“导出选中”或“导出全部”。结果另存为 PNG，原图保留，重名输出自动编号。
+
+目前在 Windows 11 x64 开发环境验证，其他系统尚未完成发布验证。
+JavaScript 版仍有首次识别速度、限色与聚类结果差异，详见 [已知限制](docs/JAVASCRIPT_PROTOTYPE.md#实验限制)。
+源码同时保留 Python 版，可用于原算法处理与结果对照。
 
 ## 两套桌面版本
 
@@ -42,8 +67,8 @@ launch.py                 原有 Python 启动命令的兼容入口
 启动PixelRegrid-JS.bat      JavaScript 双击启动入口
 ```
 
-原来的 `1/`、`2/` 已合并到 `test-images/`，已有输出保留在其中的 `perfect_pixel_output/`。
-本机虚拟环境仍位于 `.venv/`，Python 设置和日志仍保存在项目根目录，已有参数无需迁移。
+本地测试图片放在 `test-images/`，输出放在其中的 `perfect_pixel_output/`，均不提交到 Git。
+Python 虚拟环境使用 `.venv/`，设置和日志保存在项目根目录。
 
 ## Python 版：源码运行
 
@@ -62,6 +87,12 @@ Set-Location ..
 
 之后可直接双击 `启动PixelRegrid-Python.bat`。启动不会联网安装依赖；修改前端后需要重新执行
 `npm run build`。也可以直接运行 `python/launch.py`。
+如果官方 PyPI 下载较慢，可仅对本次安装指定镜像，不必修改全局配置：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r python/requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
 旧 Tkinter 界面保留供回退与手动回归使用：
 
 ```powershell
@@ -95,6 +126,12 @@ npm run desktop:dev
 ```
 
 生成 `dist/PixelRegrid-JS/PixelRegrid-JS.exe`，无需携带 Python 环境。
+生成版本化 ZIP 和 SHA-256 校验文件：
+
+```powershell
+.\scripts\package_release.ps1
+```
+
 构建选项、测试方法和已知限制见 [JavaScript 指南](docs/JAVASCRIPT_PROTOTYPE.md)。
 
 ## 使用
@@ -120,7 +157,13 @@ F 适应窗口，1 显示实际像素。移除列表项不会删除原图。
 
 ## 开发与测试
 
-从项目根目录执行 Python 完整回归测试；其中 `test_gui.py` 会打开旧 Tkinter 测试窗口，请按需手动运行：
+从项目根目录执行不创建窗口的 Python 测试：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/test_python.py
+```
+
+以下完整回归还包含 `test_gui.py`，会打开旧 Tkinter 测试窗口，请按需手动运行：
 
 ```powershell
 $env:TEMP = Join-Path (Get-Location) '.test_tmp'
@@ -150,3 +193,12 @@ npm run build
 - [Bocchi-The-Glock/Real-PixelArt](https://github.com/Bocchi-The-Glock/Real-PixelArt)：其 JavaScript 图片处理、Tauri 桌面外壳和系统 WebView 的轻量化方案，为本项目迁移到 JavaScript、减小发布包体积提供了参考。
 
 具体算法来源、改动与第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 许可证与发布验证
+
+项目原创代码和自制样例采用 [MIT](LICENSE) 许可证，版权署名为 `mmm-2006`；
+第三方代码和依赖保留各自许可证与署名。
+
+源码提交和 Pull Request 的自动测试、Windows 桌面构建由 `.github/workflows/ci.yml` 定义。
+干净源码安装和预发布包验证记录见 [发布验证](docs/RELEASE_VALIDATION.md)，
+当前版本说明见 [v0.1.0-beta.1](docs/releases/v0.1.0-beta.1.md)。

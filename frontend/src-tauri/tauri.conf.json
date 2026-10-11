@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Pixel Regrid",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "identifier": "local.pixelregrid.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -10,8 +10,22 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Pixel Regrid · JavaScript 实验版", "width": 1280, "height": 820, "minWidth": 1000, "minHeight": 640, "backgroundColor": "#f4f5f7" }],
-    "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; form-action 'none'" }
+    "windows": [
+      {
+        "title": "Pixel Regrid · JavaScript 实验版",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1000,
+        "minHeight": 640,
+        "backgroundColor": "#f4f5f7"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; form-action 'none'"
+    }
   },
-  "bundle": { "active": false, "icon": [] }
+  "bundle": {
+    "active": false,
+    "icon": []
+  }
 }

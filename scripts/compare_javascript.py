@@ -85,14 +85,15 @@ def main():
     add("undersized-canvas", image, Options(direct=True, layout="keep", canvas=(2, 2)))
     folder = ROOT / "test-images"
     samples = json.loads((folder / "samples.json").read_text(encoding="utf-8"))
-    for sample in samples:
-        path = folder / sample["file"]
+    samples = [("demo", ROOT / "docs/assets/demo-original.png")] + [
+        (sample["group"], folder / sample["file"]) for sample in samples]
+    for group, path in samples:
         if not path.is_file():
-            print(f"Skipping local image not present: {sample['file']}")
+            print(f"Skipping local image not present: {path.name}")
             continue
         source = read_image(path)
         for method in ("nearest", "pixel", "k-centroid"):
-            add(f"real-{sample['group']}-{path.stem}-{method}", source,
+            add(f"real-{group}-{path.stem}-{method}", source,
                 Options(layout="canvas_fit", canvas=(32, 32), resample=method,
                         palette_size=32, detail=1), exact=False)
     (DEST / "references.json").write_text(json.dumps(cases, ensure_ascii=False), encoding="utf-8")

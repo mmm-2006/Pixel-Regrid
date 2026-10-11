@@ -1,4 +1,4 @@
-param([switch]$UseRustMirror)
+﻿param([switch]$UseRustMirror)
 $ErrorActionPreference = 'Stop'
 $taskProjectRoot = Split-Path -Parent $PSScriptRoot
 Push-Location (Join-Path $taskProjectRoot 'frontend')
@@ -21,6 +21,8 @@ try {
     New-Item -ItemType Directory -Force -Path $taskDestination | Out-Null
     Copy-Item -LiteralPath 'src-tauri\target\release\pixel-regrid.exe' -Destination (Join-Path $taskDestination 'PixelRegrid-JS.exe')
     Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'THIRD_PARTY_NOTICES.md') -Destination $taskDestination
+    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'LICENSE') -Destination $taskDestination
+    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\使用说明.txt') -Destination $taskDestination
     Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\JAVASCRIPT_PROTOTYPE.md') -Destination $taskDestination
     Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\JAVASCRIPT_EVALUATION.md') -Destination $taskDestination
     $taskNotices = "--output=$(Join-Path $taskDestination 'RUST_NOTICES.txt')"

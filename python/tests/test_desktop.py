@@ -119,7 +119,8 @@ class DesktopTests(unittest.TestCase):
             self.api._worker.join(5)
         state = self.api.get_state()
         self.assertFalse(state["busy"])
-        self.assertEqual([file["status"] for file in state["files"]], ["success", "error"])
+        self.assertEqual([file["status"] for file in state["files"]], ["success", "error"],
+                         state["details"])
         self.assertEqual(state["progress"], dict(done=2, total=2))
         first = Path(state["files"][0]["output"])
         self.api.start_export([self.key], self.options)

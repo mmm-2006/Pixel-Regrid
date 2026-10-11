@@ -42,7 +42,8 @@ cargo test --release --features custom-protocol
 ```
 
 对照覆盖透明裁边、画布布局、最近邻分数尺寸、自动/指定网格、中心/中位数/多数色取样、
-颜色预算、三种缩放、全透明图片、无效尺寸，并读取 `test-images/samples.json` 指定的四张 PNG。
+颜色预算、三种缩放、全透明图片、无效尺寸，以及随源码提供的 `docs/assets/demo-original.png`。
+本机存在测试图片时，还会读取 `test-images/samples.json` 指定的四张 PNG；CI 不依赖这些个人图片。
 原图只读，像素参考与详细结果保存在被 Git 忽略的 `prototype-results/`。
 
 JavaScript 单元测试还覆盖 FFT 的任意长度变换、后台线程缓存及像素数据传输、
