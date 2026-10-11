@@ -142,3 +142,11 @@ npm run build
 `npm run dev` 可用于浏览器内检查界面样式；完整文件操作需要桌面桥接。
 跨版本算法对照见 [本地图片测试说明](test-images/README.md)。
 第三方许可与来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 致谢与参考
+
+- [theamusing/perfectPixel](https://github.com/theamusing/perfectPixel)：Python 版使用其网格识别与还原算法，JavaScript 版移植了相关检测与网格校正逻辑。
+- [Astropulse/pixeldetector](https://github.com/Astropulse/pixeldetector)：k-centroid 缩放参考了其局部聚类和主色取样实现。
+- [Bocchi-The-Glock/Real-PixelArt](https://github.com/Bocchi-The-Glock/Real-PixelArt)：其 JavaScript 图片处理、Tauri 桌面外壳和系统 WebView 的轻量化方案，为本项目迁移到 JavaScript、减小发布包体积提供了参考。
+
+具体算法来源、改动与第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
