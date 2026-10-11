@@ -1,0 +1,226 @@
+{
+  "implementation": "JavaScript",
+  "examples": [
+    {
+      "name": "ice-cream-grid",
+      "source": "test-images/ChatGPT 图像 2026年10月9日 22_36_59.png",
+      "options": {
+        "direct": false,
+        "method": "center",
+        "layout": "original",
+        "resample": "pixel",
+        "width": 32,
+        "height": 32,
+        "palette_size": 32,
+        "detail": 1,
+        "alpha_threshold": 1
+      },
+      "info": {
+        "grid": [
+          42,
+          42
+        ],
+        "subject": [
+          20,
+          35
+        ],
+        "has_alpha": true,
+        "recovery": "grid",
+        "alpha_threshold": 1
+      },
+      "output_subject": [
+        20,
+        35
+      ],
+      "scaled_size": null,
+      "explanation": {
+        "info_text": "网格 42×42 · 主体 20×35 · 最小画布 20×35",
+        "scaling_text": "缩放提示：主体未缩放，裁边或补透明画布不计入尺寸变化。",
+        "attention": false
+      },
+      "output": {
+        "file": "ice-cream-grid.png",
+        "width": 42,
+        "height": 42
+      }
+    },
+    {
+      "name": "ice-cream-crop",
+      "source": "test-images/ChatGPT 图像 2026年10月9日 22_36_59.png",
+      "options": {
+        "direct": false,
+        "method": "center",
+        "layout": "keep",
+        "resample": "pixel",
+        "width": 20,
+        "height": 35,
+        "palette_size": 32,
+        "detail": 1,
+        "alpha_threshold": 1
+      },
+      "info": {
+        "grid": [
+          42,
+          42
+        ],
+        "subject": [
+          20,
+          35
+        ],
+        "has_alpha": true,
+        "recovery": "grid",
+        "alpha_threshold": 1
+      },
+      "output_subject": [
+        20,
+        35
+      ],
+      "scaled_size": null,
+      "explanation": {
+        "info_text": "网格 42×42 · 主体 20×35 · 最小画布 20×35",
+        "scaling_text": "缩放提示：主体未缩放，裁边或补透明画布不计入尺寸变化。",
+        "attention": false
+      },
+      "output": {
+        "file": "ice-cream-crop.png",
+        "width": 20,
+        "height": 35
+      }
+    },
+    {
+      "name": "ice-cream-fit",
+      "source": "test-images/ChatGPT 图像 2026年10月9日 22_36_59.png",
+      "options": {
+        "direct": false,
+        "method": "center",
+        "layout": "fit",
+        "resample": "pixel",
+        "width": 20,
+        "height": 32,
+        "palette_size": 32,
+        "detail": 1,
+        "alpha_threshold": 1
+      },
+      "info": {
+        "grid": [
+          42,
+          42
+        ],
+        "subject": [
+          20,
+          35
+        ],
+        "has_alpha": true,
+        "recovery": "grid",
+        "alpha_threshold": 1
+      },
+      "output_subject": [
+        18,
+        32
+      ],
+      "scaled_size": [
+        18,
+        32
+      ],
+      "explanation": {
+        "info_text": "网格 42×42 · 主体 20×35 · 最小画布 20×35",
+        "scaling_text": "主体 20×35 → 18×32 · 宽缩小 10.0% · 高缩小 8.6%",
+        "attention": false
+      },
+      "output": {
+        "file": "ice-cream-fit.png",
+        "width": 20,
+        "height": 32
+      }
+    },
+    {
+      "name": "enchanting-table-grid",
+      "source": "test-images/advanced_enchanting_table_top_diamond_ai.png",
+      "options": {
+        "direct": false,
+        "method": "center",
+        "layout": "original",
+        "resample": "pixel",
+        "width": 32,
+        "height": 32,
+        "palette_size": 32,
+        "detail": 1,
+        "alpha_threshold": 1
+      },
+      "info": {
+        "grid": [
+          30,
+          30
+        ],
+        "subject": [
+          30,
+          30
+        ],
+        "has_alpha": false,
+        "recovery": "grid",
+        "alpha_threshold": 1
+      },
+      "output_subject": [
+        30,
+        30
+      ],
+      "scaled_size": null,
+      "explanation": {
+        "info_text": "网格 30×30 · 主体 30×30 · 最小画布 30×30",
+        "scaling_text": "缩放提示：主体未缩放，裁边或补透明画布不计入尺寸变化。",
+        "attention": false
+      },
+      "output": {
+        "file": "enchanting-table-grid.png",
+        "width": 30,
+        "height": 30
+      }
+    },
+    {
+      "name": "enchanting-table-fit",
+      "source": "test-images/advanced_enchanting_table_top_diamond_ai.png",
+      "options": {
+        "direct": false,
+        "method": "center",
+        "layout": "canvas_fit",
+        "resample": "pixel",
+        "width": 32,
+        "height": 32,
+        "palette_size": 32,
+        "detail": 1,
+        "alpha_threshold": 1
+      },
+      "info": {
+        "grid": [
+          30,
+          30
+        ],
+        "subject": [
+          30,
+          30
+        ],
+        "has_alpha": false,
+        "recovery": "grid",
+        "alpha_threshold": 1
+      },
+      "output_subject": [
+        32,
+        32
+      ],
+      "scaled_size": [
+        32,
+        32
+      ],
+      "explanation": {
+        "info_text": "网格 30×30 · 主体 30×30 · 最小画布 30×30",
+        "scaling_text": "整图 30×30 → 32×32 · 宽放大 6.7% · 高放大 6.7%",
+        "attention": false
+      },
+      "output": {
+        "file": "enchanting-table-fit.png",
+        "width": 32,
+        "height": 32
+      }
+    }
+  ]
+}

@@ -103,6 +103,9 @@ Python 的设置和日志位于仓库根目录，沿用 `perfect_pixel_settings.
 JavaScript 使用应用数据目录，标识为 `local.pixelregrid.desktop`；新设置不存在时读取旧实验版设置。
 设置、日志、依赖目录和构建产物均不提交到 Git。
 
-README 效果图由 `scripts/create_demo.py` 生成，自制扰动样例经过实际 Python 算法处理。
+README 效果图由 `scripts/create_readme_examples.py` 生成，使用 `test-images/` 中的冰淇淋和附魔台顶面原图，
+调用桌面 Worker 使用的 JavaScript 算法。原尺寸输出与参数记录保存在 `docs/assets/` 和 `examples.json`。
+运行 `.\.venv\Scripts\python.exe scripts/create_readme_examples.py` 可更新效果图，随后运行
+`scripts/capture_readme.py` 更新界面图。`scripts/create_demo.py` 的自制扰动样例保留用于算法回归。
 界面图由 `scripts/capture_readme.py` 在无头浏览器中渲染真实 Vue 前端，使用隔离的演示桥接数据。
 更新展示图需先安装 Python 依赖并构建前端；界面图生成还需要 Chrome 或 Edge。

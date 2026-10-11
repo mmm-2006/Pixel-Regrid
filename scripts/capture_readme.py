@@ -21,22 +21,19 @@ def picture(path):
 
 
 def main():
-    source = picture(ROOT / "docs/assets/demo-original.png")
-    result_path = ROOT / ".test_tmp/readme-demo-32.png"
-    result_path.parent.mkdir(exist_ok=True)
-    with Image.open(ROOT / "docs/assets/demo-result.png") as restored:
-        restored.resize((32, 32), Image.Resampling.NEAREST).save(result_path)
-    result = picture(result_path)
-    options = dict(direct=False, method="center", layout="canvas_fit", width=32,
-                   height=32, resample="nearest", palette_size=32, detail=1, alpha_threshold=1)
-    state = dict(ok=True, revision=1, files=[dict(key="demo", name="demo-original.png",
-                 path="自制扰动样例", status="pending", size=None)], options=options,
+    (ROOT / ".test_tmp").mkdir(exist_ok=True)
+    examples = json.loads((ROOT / "docs/assets/examples.json").read_text(encoding="utf-8"))
+    example = next(item for item in examples["examples"] if item["name"] == "ice-cream-fit")
+    source_path = ROOT / example["source"]
+    source = picture(source_path)
+    result = picture(ROOT / "docs/assets" / example["output"]["file"])
+    options = example["options"]
+    state = dict(ok=True, revision=1, files=[dict(key="demo", name=source_path.name,
+                 path=example["source"], status="pending", size=None)], options=options,
                  busy=False, cancelling=False, closing=False, status="已添加 1 张图片",
                  progress=dict(done=0, total=0), details=[], output_dir="")
     preview = dict(ok=True, original=source, output=result, error=None,
-                   info=dict(grid=[16, 16], subject=[14, 15]),
-                   info_text="自动识别：384 × 384 → 16 × 16 网格 · PNG · 透明背景",
-                   scaling_text="整图等比例缩放到 32 × 32 画布", attention=False)
+                   info=example["info"], **example["explanation"])
     bridge = """<script>
     const demoState = STATE, demoPreview = PREVIEW;
     window.pywebview = {api: {
