@@ -1,8 +1,9 @@
 Perfect Pixel 像素画整理工具
 
 界面更新
-默认界面已迁移到 pywebview + Vue，独立桌面窗口，本地加载，无需打开浏览器。
-开发者首次运行请按 README.md 安装依赖并构建 frontend；Windows 需要 WebView2 Runtime。
+Python 版使用 pywebview + Vue；JavaScript 版使用 Tauri + Vue。
+两套版本都是独立桌面窗口，本地加载，无需打开浏览器。
+开发者首次运行请按项目根目录 README.md 安装依赖并构建 frontend；Windows 需要 WebView2 Runtime。
 左侧图片库、中间预览、右侧参数；支持滚轮缩放、拖动平移和用途预设。
 高级设置默认收起。可导出选中图片或导出全部。
 并排预览同步操作；按 F 适应窗口，按 1 显示实际像素。
@@ -10,7 +11,8 @@ Perfect Pixel 像素画整理工具
 旧 Tkinter 界面可通过 python launch.py --legacy 打开。
 
 启动
-双击“启动PerfectPixel.bat”。使用现有 .venv 环境，不会联网或自动安装依赖。
+Python 版双击根目录“启动PerfectPixel.bat”。使用现有 .venv 环境，不会联网或自动安装依赖。
+JavaScript 版双击 dist/PerfectPixel-JS/PerfectPixel-JS.exe，无需 Python 环境。
 启动出错会显示原因；运行错误记录在 perfect_pixel.log（自动轮换，最多约 3 MB）。
 
 日常使用
@@ -54,7 +56,8 @@ PNG 透明通道会保留；16 位图片转换成 8 位 PNG。TIF/TIFF 只处理
 迁移为整图等比例缩放的目标画布。已设置的画布布局和尺寸会保留。
 旧的“只裁透明边 · 最小画布”设置会恢复为保持原画布；裁边统一使用“裁到主体大小”。
 旧的“方块铺满”设置会迁移为整图等比例缩放，目标宽高与缩放算法保持原设置。
-设置保存在 perfect_pixel_settings.json；删除该文件可恢复默认设置。
+Python 版设置保存在根目录 perfect_pixel_settings.json；删除该文件可恢复默认设置。
+JavaScript 版使用独立的应用数据目录保存设置，不修改 Python 版参数。
 
 主体与画布
 主体尺寸是还原网格后（直接转换时为原图），透明度超过“透明噪点阈值”的
@@ -162,6 +165,6 @@ Ctrl+O：添加图片。列表获得焦点时 Ctrl+A：全选，Delete：移除�
 请保留 .venv 文件夹；它依赖原 Python 路径，移动项目后可能需要重建环境。
 恢复环境时使用兼容的 Python（当前为 3.13）：
   python -m venv .venv
-  .venv\Scripts\python.exe -m pip install -r requirements.txt
+  .venv\Scripts\python.exe -m pip install -r python/requirements.txt
 运行回归测试：
   .venv\Scripts\python.exe -m unittest discover -s tests -v

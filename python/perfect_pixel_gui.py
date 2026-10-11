@@ -25,7 +25,7 @@ from pixel_core import (Options, SUPPORTED, SCALE_CHANGE_THRESHOLD, canvas_limit
                         layout_image, path_key, prepare_image, process_file, read_image,
                         scaling_info, scan_folder)
 
-HERE = Path(__file__).resolve().parent
+from pixel_paths import APP_HOME as HERE
 SETTINGS = HERE / "perfect_pixel_settings.json"
 from pixel_ui_shared import (METHODS, LAYOUTS, RESAMPLERS, PALETTES, DETAILS,
                              LAYOUT_HELP, RESAMPLE_HELP, info_text, scaling_text)

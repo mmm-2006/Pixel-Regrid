@@ -18,8 +18,7 @@ from pixel_core import (Options, SUPPORTED, image_info, layout_image, path_key,
 from pixel_ui_shared import (METHODS, LAYOUTS, RESAMPLERS, PALETTES, DETAILS,
                              info_text, scaling_text)
 
-HERE = Path(__file__).resolve().parent
-APP_HOME = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else HERE
+from pixel_paths import APP_HOME, RESOURCE_ROOT as HERE
 DEFAULTS = dict(direct=False, method="center", layout="original", width=32,
                 height=32, resample="pixel", palette_size=32, detail=1, alpha_threshold=1)
 

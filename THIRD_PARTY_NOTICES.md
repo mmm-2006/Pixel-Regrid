@@ -1,6 +1,6 @@
 # k-centroid
 
-`pixel_k_centroid.py` adapts the local color clustering and dominant-color
+`python/pixel_k_centroid.py` adapts the local color clustering and dominant-color
 resizing approach from Astropulse's `pixeldetector/k-centroid.py`:
 https://github.com/Astropulse/pixeldetector/blob/6e88e18ddbd16529b5dd85b1c615cbb2e5778bf2/k-centroid.py
 
@@ -135,7 +135,7 @@ The JavaScript port uses native typed arrays and does not bundle OpenCV or NumPy
 The experimental desktop uses Tauri 2, its dialog plugin, Rust image codecs, and
 the Tauri JavaScript adapters. The exact Rust versions are pinned in
 frontend/src-tauri/Cargo.lock and JavaScript versions in frontend/package-lock.json.
-build_javascript.ps1 collects the packages' full license/notice files into
+scripts/build_javascript.ps1 collects the packages' full license/notice files into
 dist/PerfectPixel-JS/RUST_NOTICES.txt for distribution alongside the executable.
 The prototype does not include code copied from Real-PixelArt; that project was
 used as an architecture and package-size reference.

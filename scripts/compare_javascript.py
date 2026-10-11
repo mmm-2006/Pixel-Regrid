@@ -11,7 +11,7 @@ from pathlib import Path
 import sys
 import time
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 import cv2
 import numpy as np
 from pixel_core import Options, prepare_image, layout_image, read_image
@@ -83,13 +83,18 @@ def main():
         blank = np.zeros((8, 8, 4), np.uint8)
         add(f"blank-{layout}", blank, Options(direct=True, layout=layout, canvas=(16, 16), resample="nearest"))
     add("undersized-canvas", image, Options(direct=True, layout="keep", canvas=(2, 2)))
-    for folder in (ROOT / "1", ROOT / "2"):
-        for path in sorted(folder.glob("*.png"))[:2]:
-            source = read_image(path)
-            for method in ("nearest", "pixel", "k-centroid"):
-                add(f"real-{folder.name}-{path.stem}-{method}", source,
-                    Options(layout="canvas_fit", canvas=(32, 32), resample=method,
-                            palette_size=32, detail=1), exact=False)
+    folder = ROOT / "图片测试"
+    samples = json.loads((folder / "samples.json").read_text(encoding="utf-8"))
+    for sample in samples:
+        path = folder / sample["file"]
+        if not path.is_file():
+            print(f"Skipping local image not present: {sample['file']}")
+            continue
+        source = read_image(path)
+        for method in ("nearest", "pixel", "k-centroid"):
+            add(f"real-{sample['group']}-{path.stem}-{method}", source,
+                Options(layout="canvas_fit", canvas=(32, 32), resample=method,
+                        palette_size=32, detail=1), exact=False)
     (DEST / "references.json").write_text(json.dumps(cases, ensure_ascii=False), encoding="utf-8")
     print(f"Generated {len(cases)} Python reference cases in prototype-results/references.json")
 

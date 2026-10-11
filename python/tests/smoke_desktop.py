@@ -1,6 +1,6 @@
 """Exercise the built Vue UI in real WebView2 with isolated images/settings.
 
-Run manually: .venv\Scripts\python.exe tests\smoke_desktop.py
+Run manually from the project root: .venv\Scripts\python.exe python\tests\smoke_desktop.py
 Native file dialogs are substituted so this check does not depend on UI automation.
 Use --keep-open to inspect the final desktop test window.
 """

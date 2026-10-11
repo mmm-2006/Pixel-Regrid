@@ -1,6 +1,7 @@
 # JavaScript 轻量化实验
 
-实验分支：`codex/javascript-prototype`。Python 版与原来的启动方式保留。
+JavaScript 版从 `codex/javascript-prototype` 合并到主分支，与 Python 版并存。
+Python 源码位于 `python/`，原来的 `launch.py` 和双击启动方式保留。
 
 Vue 界面继续使用。Tauri 提供窗口、文件对话框、图片格式解码、PNG 编码、
 扫描目录和安全保存；网格检测、取色、结构保护、k-centroid 和画布布局在
@@ -18,9 +19,9 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
-根目录的 `build_javascript.ps1` 会构建并将 EXE 复制到 `dist/PerfectPixel-JS`。
+根目录执行 `scripts/build_javascript.ps1` 会构建并将 EXE 复制到 `dist/PerfectPixel-JS`。
 首次构建会下载 Rust 依赖；官方源无法连接时可使用
-`./build_javascript.ps1 -UseRustMirror`，仅这次构建使用 rsproxy，不修改全局配置。
+`./scripts/build_javascript.ps1 -UseRustMirror`，仅这次构建使用 rsproxy，不修改全局配置。
 实验版偏好设置写入独立的应用数据目录，不读写 Python 版设置。
 
 ## 自动验证
@@ -29,7 +30,7 @@ npm run desktop:build
 
 ```powershell
 # 根目录，Python 仅用于生成现有实现的对照数据
-.\.venv\Scripts\python.exe tests/compare_javascript.py
+.\.venv\Scripts\python.exe scripts/compare_javascript.py
 node frontend/scripts/compare.mjs
 
 cd frontend
@@ -39,7 +40,7 @@ cargo test --release --features custom-protocol
 ```
 
 对照覆盖透明裁边、画布布局、最近邻分数尺寸、自动/指定网格、中心/中位数/多数色取样、
-颜色预算、三种缩放、全透明图片、无效尺寸，并读取本地 `1/`、`2/` 各前两张 PNG。
+颜色预算、三种缩放、全透明图片、无效尺寸，并读取 `图片测试/samples.json` 指定的四张 PNG。
 原图只读，像素参考与详细结果保存在被 Git 忽略的 `prototype-results/`。
 
 JavaScript 单元测试还覆盖 FFT 的任意长度变换、后台线程缓存及像素数据传输、
@@ -57,7 +58,7 @@ JavaScript 单元测试还覆盖 FFT 的任意长度变换、后台线程缓存�
 - 实验版自动网格识别最多处理 400 万像素，直接转换的读取上限仍为 3200 万像素。
 - 图片按导入后的读取缓存使用；外部修改原图后应移除并重新导入。
 - Rust 格式解码与 OpenCV 的 JPEG、WebP、TIFF、色彩配置文件处理仍需进一步对照。
-- 原生窗口、系统文件对话框和 WebView2 中的实际操作留待手动验证；编译与算法测试不替代它们。
+- 用户已进行桌面手动试用并反馈没有发现问题；编译与算法测试不代表完整的发布兼容性验证。
 
-本分支用于判断迁移可行性，尚不代表完整替代 Python 版。测量结果见
+JavaScript 版继续保留实验限制，不替代 Python 版。测量结果见
 [JAVASCRIPT_EVALUATION.md](JAVASCRIPT_EVALUATION.md)。

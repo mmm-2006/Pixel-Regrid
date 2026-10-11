@@ -1,6 +1,7 @@
 param([switch]$UseRustMirror)
 $ErrorActionPreference = 'Stop'
-Push-Location (Join-Path $PSScriptRoot 'frontend')
+$taskProjectRoot = Split-Path -Parent $PSScriptRoot
+Push-Location (Join-Path $taskProjectRoot 'frontend')
 try {
     & npm.cmd ci --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw 'npm dependency installation failed.' }
@@ -16,12 +17,12 @@ try {
         & npm.cmd run desktop:build
         if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }
     }
-    $taskDestination = Join-Path $PSScriptRoot 'dist\PerfectPixel-JS'
+    $taskDestination = Join-Path $taskProjectRoot 'dist\PerfectPixel-JS'
     New-Item -ItemType Directory -Force -Path $taskDestination | Out-Null
     Copy-Item -LiteralPath 'src-tauri\target\release\perfect-pixel-js.exe' -Destination (Join-Path $taskDestination 'PerfectPixel-JS.exe')
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'THIRD_PARTY_NOTICES.md') -Destination $taskDestination
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'JAVASCRIPT_PROTOTYPE.md') -Destination $taskDestination
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'JAVASCRIPT_EVALUATION.md') -Destination $taskDestination
+    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'THIRD_PARTY_NOTICES.md') -Destination $taskDestination
+    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\JAVASCRIPT_PROTOTYPE.md') -Destination $taskDestination
+    Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'docs\JAVASCRIPT_EVALUATION.md') -Destination $taskDestination
     $taskNotices = "--output=$(Join-Path $taskDestination 'RUST_NOTICES.txt')"
     if ($UseRustMirror) { & node scripts/native-notices.mjs --mirror $taskNotices }
     else { & node scripts/native-notices.mjs $taskNotices }
